@@ -1,0 +1,368 @@
+<!--
+Build a vanilla (no depencies) single page application that allows me to build and play a piano roll, with time in the X axis and note (C1 to B7) in the Y axis. Each beat can have a total of 4 instruments play at once (denoted by corner squares), for starteras just assign different wave types to Instruments, so Sine, Square, Sawtooth and Triangle.no dummy, each beat can 
+
+have 4 instruments play at once
+
+use a canvas and svg if you're going to use so many squares
+
+ok first off, there is no script, it's all inline so only output HTML
+
+second it kinda works? but I did mean fill the corner and not just a dot
+
+Update the following to have less space so that the corners in each cell touch.
+
+now they're huge
+
+fix the following code to play Sine, Square, Sawtooth or Triangle waves from C1 to B7 (1 per row so the vertical axis), and Hold means that repetitive notes are like holding them for longer
+
+fool, the vertical scrollbar does nothing
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rolidy 0.1</title>
+<style>
+  body {font-family:Arial,sans-serif;margin:0;padding:0;overflow:hidden;}
+  #toolbar {padding:10px;background:#222;color:#fff;display:flex;align-items:center;flex-wrap:wrap;}
+  #toolbar > * {margin-right:15px;}
+  
+  /* Main Layout: A single scrollable container */
+  #pianoRollContainer {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 50px);
+    overflow: auto; /* Enables both vertical and horizontal scrolling */
+    background: #fafafa;
+  }
+  
+  /* Inner wrapper to hold labels and canvas side-by-side */
+  #rollInner {
+    display: flex;
+    flex-direction: row;
+  }
+  
+  /* Labels Column */
+  #labelsCol {
+    width: 50px;
+    flex-shrink: 0; /* Prevents shrinking */
+    background: #f0f0f0;
+    z-index: 10;
+    
+    /* MAGIC: Sticks to the left when scrolling horizontally, 
+       but moves vertically with the content */
+    position: sticky; 
+    left: 0;
+    
+    border-right: 2px solid #999;
+    box-sizing: border-box;
+  }
+  
+  .label-row {
+    height: 20px;
+    line-height: 20px;
+    font-size: 10px;
+    text-align: right;
+    padding-right: 5px;
+    border-bottom: 1px solid #eee;
+    background: #f0f0f0; /* Must have background to hide grid scrolling behind it */
+    box-sizing: border-box;
+  }
+  
+  canvas {display: block;}
+  
+  #playBtn,#stopBtn{padding:5px 10px;border:none;color:#fff;cursor:pointer;}
+  #playBtn{background:#4caf50;}
+  #stopBtn{background:#f44336;}
+  select{padding:2px;}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <label>🟥
+    <select id="wave0"><option>sine</option><option selected>square</option><option>sawtooth</option><option>triangle</option></select>
+  </label>
+  <label>🟦
+    <select id="wave1"><option>sine</option><option>square</option><option selected>sawtooth</option><option>triangle</option></select>
+  </label>
+  <label>🟩
+    <select id="wave2"><option selected>sine</option><option>square</option><option>sawtooth</option><option>triangle</option></select>
+  </label>
+  <label>🟨
+    <select id="wave3"><option>triangle</option><option>square</option><option>sawtooth</option><option selected>sine</option></select>
+  </label>
+  
+  <label>Hold (Legato)
+    <input type="checkbox" id="hold" />
+  </label>
+
+  <button id="playBtn">▶ Play</button>
+  <button id="stopBtn">⏹ Stop</button>
+</div>
+
+<div id="pianoRollContainer">
+  <div id="rollInner">
+    <div id="labelsCol"></div>
+    <canvas id="rollCanvas"></canvas>
+  </div>
+</div>
+
+<script>
+/* -------------------------------------------------
+   CONFIGURATION
+   ------------------------------------------------- */
+const PITCHES = [];
+// Generate C1 to B7
+for (let oct = 1; oct <= 7; oct++) {
+  const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  notes.forEach(n => PITCHES.push(n + oct));
+}
+
+const BEATS = 64;
+const SUBDIV = 4;
+const STEPS = BEATS * SUBDIV;
+const CELL_W = 40;
+const CELL_H = 20;
+const TEMPO = 120;
+
+/* -------------------------------------------------
+   DATA MODEL
+   ------------------------------------------------- */
+const notes = Array.from({ length: STEPS }, () =>
+  new Uint8Array(PITCHES.length)
+);
+
+/* -------------------------------------------------
+   CANVAS & DOM SETUP
+   ------------------------------------------------- */
+const canvas = document.getElementById('rollCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = STEPS * CELL_W;
+canvas.height = PITCHES.length * CELL_H;
+
+const labelsCol = document.getElementById('labelsCol');
+
+// Populate Labels
+PITCHES.forEach(p => {
+  const div = document.createElement('div');
+  div.className = 'label-row';
+  div.innerText = p;
+  labelsCol.appendChild(div);
+});
+
+// IMPORTANT: Set explicit height on the labels column so it matches canvas height
+// This ensures the vertical scrollbar appears on the container.
+labelsCol.style.height = canvas.height + 'px';
+
+/* -------------------------------------------------
+   DRAWING
+   ------------------------------------------------- */
+function clearCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawGrid() {
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 1;
+
+  // Vertical lines
+  for (let x = 0; x <= STEPS; x++) {
+    ctx.beginPath();
+    ctx.moveTo(x * CELL_W, 0);
+    ctx.lineTo(x * CELL_W, canvas.height);
+    ctx.stroke();
+  }
+
+  // Horizontal lines
+  for (let y = 0; y <= PITCHES.length; y++) {
+    ctx.beginPath();
+    ctx.moveTo(0, y * CELL_H);
+    ctx.lineTo(canvas.width, y * CELL_H);
+    ctx.stroke();
+  }
+
+  // Beat numbers
+  ctx.fillStyle = '#333';
+  ctx.font = '12px Arial';
+  ctx.textAlign = 'center';
+  for (let b = 0; b <= BEATS; b++) {
+    const x = b * CELL_W * SUBDIV + (CELL_W * SUBDIV) / 2;
+    ctx.fillText(b + 1, x, 14);
+  }
+}
+
+function drawNotes() {
+  for (let step = 0; step < STEPS; step++) {
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const mask = notes[step][pitch];
+      if (!mask) continue;
+
+      const x = step * CELL_W;
+      const y = pitch * CELL_H;
+
+      ctx.fillStyle = 'rgba(220, 220, 255, 0.3)';
+      ctx.fillRect(x, y, CELL_W, CELL_H);
+
+      for (let i = 0; i < 4; i++) {
+        if (mask & (1 << i)) drawCornerSquare(x, y, i);
+      }
+    }
+  }
+}
+
+function drawCornerSquare(cellX, cellY, instIdx) {
+  const w = CELL_W / 2;
+  const h = CELL_H / 2;
+  let cx = cellX;
+  let cy = cellY;
+
+  if (instIdx === 1) cx = cellX + w;
+  if (instIdx === 2) cy = cellY + h;
+  if (instIdx === 3) { cx = cellX + w; cy = cellY + h; }
+
+  ctx.fillStyle = getWaveColor(instIdx);
+  ctx.fillRect(cx + 1, cy + 1, w - 2, h - 2);
+}
+
+function getWaveColor(i) {
+  const colors = ['#d32f2f', '#1976d2', '#388e3c', '#fbc02d'];
+  return colors[i % colors.length];
+}
+
+function redrawAll() {
+  clearCanvas();
+  drawGrid();
+  drawNotes();
+}
+
+/* -------------------------------------------------
+   INTERACTION
+   ------------------------------------------------- */
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  const step = Math.floor(mx / CELL_W);
+  const pitch = Math.floor(my / CELL_H);
+  if (step < 0 || step >= STEPS || pitch < 0 || pitch >= PITCHES.length) return;
+
+  const relX = mx - step * CELL_W;
+  const relY = my - pitch * CELL_H;
+  const left = relX < CELL_W / 2;
+  const top = relY < CELL_H / 2;
+  const instIdx = (top ? 0 : 2) + (left ? 0 : 1);
+
+  notes[step][pitch] ^= (1 << instIdx);
+  redrawAll();
+});
+
+/* -------------------------------------------------
+   AUDIO
+   ------------------------------------------------- */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const stepSec = (60 / TEMPO) / SUBDIV;
+
+function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+function pitchToMidi(idx) { return 24 + idx; }
+
+function scheduleNote(start, dur, pitchIdx, instIdx) {
+  const freq = midiToFreq(pitchToMidi(pitchIdx));
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  const waveSel = document.getElementById(`wave${instIdx}`);
+  osc.type = waveSel.value;
+
+  osc.frequency.setValueAtTime(freq, start);
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(0.2, start + 0.01);
+  gain.gain.setValueAtTime(0.2, start + dur - 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.1);
+}
+
+/* -------------------------------------------------
+   PLAYBACK
+   ------------------------------------------------- */
+let playAnim = null;
+let playStart = null;
+
+function startPlayback() {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (playAnim) stopPlayback();
+
+  const now = audioCtx.currentTime;
+  playStart = now;
+  const isHold = document.getElementById('hold').checked;
+
+  for (let step = 0; step < STEPS; step++) {
+    const stepStart = now + step * stepSec;
+    
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const currentMask = notes[step][pitch];
+      if (!currentMask) continue;
+
+      const prevMask = (step > 0) ? notes[step - 1][pitch] : 0;
+
+      for (let i = 0; i < 4; i++) {
+        const bit = 1 << i;
+        
+        if (currentMask & bit) {
+          if (isHold) {
+            // LEGATO: Skip if previous step had this note (it is sustaining)
+            if (prevMask & bit) continue;
+            
+            // Calculate duration
+            let length = 1;
+            for (let k = step + 1; k < STEPS; k++) {
+              if (notes[k][pitch] & bit) length++;
+              else break;
+            }
+            const dur = length * stepSec;
+            scheduleNote(stepStart, dur, pitch, i);
+            
+          } else {
+            // RETRIGGER: Always play a short note
+            const dur = stepSec * 0.9; 
+            scheduleNote(stepStart, dur, pitch, i);
+          }
+        }
+      }
+    }
+  }
+
+  function drawPlayHead() {
+    const elapsed = audioCtx.currentTime - playStart;
+    const posX = (elapsed / stepSec) * CELL_W;
+
+    redrawAll();
+    ctx.fillStyle = '#ff5722';
+    ctx.fillRect(posX, 0, 2, canvas.height);
+
+    if (elapsed < STEPS * stepSec) {
+      playAnim = requestAnimationFrame(drawPlayHead);
+    } else {
+      stopPlayback();
+    }
+  }
+  drawPlayHead();
+}
+
+function stopPlayback() {
+  if (playAnim) cancelAnimationFrame(playAnim);
+  playAnim = null;
+  redrawAll();
+}
+
+document.getElementById('playBtn').addEventListener('click', startPlayback);
+document.getElementById('stopBtn').addEventListener('click', stopPlayback);
+
+redrawAll();
+</script>
+</body>
+</html>

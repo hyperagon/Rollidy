@@ -1,0 +1,566 @@
+<!--
+    Highlight the row and column so I can see what's under my cursor.
+    
+    Give me the updated code segments.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rolidy 0.9</title>
+<style>
+  body {font-family:Arial,sans-serif;margin:0;padding:0;overflow:hidden;}
+  #toolbar {padding:10px;background:#222;color:#fff;display:flex;align-items:center;flex-wrap:wrap;}
+  #toolbar > * {margin-right:15px;}
+  
+  /* Main Layout: A single scrollable container */
+  #pianoRollContainer {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 50px);
+    overflow: auto; /* Enables both vertical and horizontal scrolling */
+    background: #fafafa;
+  }
+  
+  /* Inner wrapper to hold labels and canvas side-by-side */
+  /* Inner wrapper to hold labels and canvas side-by-side */
+  #rollInner {
+    display: flex;
+    flex-direction: row;
+    margin-bottom: 20px; /* Adds space so the bottom scrollbar doesn't cover the last instruments */
+  }
+  
+  /* Labels Column */
+  #labelsCol {
+    width: 50px;
+    flex-shrink: 0; /* Prevents shrinking */
+    background: #f0f0f0;
+    z-index: 10;
+    
+    /* MAGIC: Sticks to the left when scrolling horizontally, 
+       but moves vertically with the content */
+    position: sticky; 
+    left: 0;
+    
+    border-right: 2px solid #999;
+    box-sizing: border-box;
+  }
+  
+  .label-row {
+    height: 20px;
+    line-height: 20px;
+    font-size: 10px;
+    text-align: right;
+    padding-right: 5px;
+    border-bottom: 1px solid #eee;
+    background: #f0f0f0; /* Must have background to hide grid scrolling behind it */
+    box-sizing: border-box;
+  }
+  
+  canvas {display: block;}
+  
+  #playBtn,#stopBtn,#clearBtn,#exportBtn{padding:5px 10px;border:none;color:#fff;cursor:pointer;}
+  #playBtn{background:green;color:white;}
+  #stopBtn{background:yellow;color:black;}
+  #clearBtn{background:red;color:black;}
+  #exportBtn{background:blue;color:white;}
+  select{padding:2px;}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <label>🟥
+    <select id="wave0"><option>sine</option><option selected>square</option><option>sawtooth</option><option>triangle</option></select>
+  </label>
+  <label>🟦
+    <select id="wave1"><option>sine</option><option>square</option><option selected>sawtooth</option><option>triangle</option></select>
+  </label>
+  <label>🟩
+    <select id="wave2"><option selected>sine</option><option>square</option><option>sawtooth</option><option>triangle</option></select>
+  </label>
+  <label>🟨
+    <select id="wave3"><option>triangle</option><option>square</option><option>sawtooth</option><option selected>sine</option></select>
+  </label>
+  
+  <label>Hold
+    <input type="checkbox" id="hold" />
+  </label>
+
+  <button id="playBtn">▶ Play</button>
+  <button id="stopBtn">⏹ Stop</button>
+  <button id="exportBtn">Export</button>
+  <button id="clearBtn">Clear</button>
+  
+  <label>Loop
+    <input type="checkbox" id="loop" />
+  </label>
+</div>
+
+<div id="pianoRollContainer">
+  <div id="rollInner">
+    <div id="labelsCol"></div>
+    <canvas id="rollCanvas"></canvas>
+  </div>
+</div>
+
+<script>
+/* -------------------------------------------------
+   CONFIGURATION
+   ------------------------------------------------- */
+const PITCHES = [];
+for (let oct = 1; oct <= 7; oct++) {
+  const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  notes.forEach(n => PITCHES.push(n + oct));
+}
+
+const BEATS = 64;
+const SUBDIV = 4;
+const STEPS = BEATS * SUBDIV;
+const CELL_W = 40;
+const CELL_H = 20;
+const TEMPO = 120;
+let isPlaying = false;
+
+/* -------------------------------------------------
+   DATA MODEL
+   ------------------------------------------------- */
+const notes = Array.from({ length: STEPS }, () =>
+  new Uint8Array(PITCHES.length)
+);
+
+/* -------------------------------------------------
+   CANVAS & DOM SETUP
+   ------------------------------------------------- */
+const canvas = document.getElementById('rollCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = STEPS * CELL_W;
+canvas.height = PITCHES.length * CELL_H;
+
+const labelsCol = document.getElementById('labelsCol');
+const container = document.getElementById('pianoRollContainer'); 
+
+PITCHES.forEach(p => {
+  const div = document.createElement('div');
+  div.className = 'label-row';
+  div.innerText = p;
+  labelsCol.appendChild(div);
+});
+labelsCol.style.height = canvas.height + 'px';
+
+/* -------------------------------------------------
+   SPACEBAR CONTROL
+   ------------------------------------------------- */
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (isPlaying) stopPlayback();
+    else startPlayback();
+  }
+});
+
+/* -------------------------------------------------
+   DRAWING
+   ------------------------------------------------- */
+function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+function drawGrid() {
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= STEPS; x++) {
+    ctx.beginPath();
+    ctx.moveTo(x * CELL_W, 0);
+    ctx.lineTo(x * CELL_W, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= PITCHES.length; y++) {
+    ctx.beginPath();
+    ctx.moveTo(0, y * CELL_H);
+    ctx.lineTo(canvas.width, y * CELL_H);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#333';
+  ctx.font = '12px Arial';
+  ctx.textAlign = 'center';
+  for (let b = 0; b <= BEATS; b++) {
+    ctx.fillText(b + 1, b * CELL_W * SUBDIV + (CELL_W * SUBDIV) / 2, 14);
+  }
+}
+
+// NEW: Variables to track cursor position
+let hoverStep = -1;
+let hoverPitch = -1;
+
+// NEW: Function to draw the row/column highlight
+function drawHighlight() {
+  if (hoverStep < 0 || hoverPitch < 0) return;
+
+  // Highlight Column
+  ctx.fillStyle = 'rgba(200, 220, 255, 0.4)';
+  ctx.fillRect(hoverStep * CELL_W, 0, CELL_W, canvas.height);
+
+  // Highlight Row
+  ctx.fillStyle = 'rgba(200, 220, 255, 0.4)';
+  ctx.fillRect(0, hoverPitch * CELL_H, canvas.width, CELL_H);
+  
+  // Highlight Intersection (optional, makes it pop)
+  ctx.fillStyle = 'rgba(180, 200, 255, 0.5)';
+  ctx.fillRect(hoverStep * CELL_W, hoverPitch * CELL_H, CELL_W, CELL_H);
+}
+
+function drawNotes() {
+  for (let step = 0; step < STEPS; step++) {
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const mask = notes[step][pitch];
+      if (!mask) continue;
+      const x = step * CELL_W;
+      const y = pitch * CELL_H;
+      ctx.fillStyle = 'rgba(220, 220, 255, 0.3)';
+      ctx.fillRect(x, y, CELL_W, CELL_H);
+      for (let i = 0; i < 4; i++) {
+        if (mask & (1 << i)) drawCornerSquare(x, y, i);
+      }
+    }
+  }
+}
+
+function drawCornerSquare(cellX, cellY, instIdx) {
+  const w = CELL_W / 2;
+  const h = CELL_H / 2;
+  let cx = cellX;
+  let cy = cellY;
+  if (instIdx === 1) cx = cellX + w;
+  if (instIdx === 2) cy = cellY + h;
+  if (instIdx === 3) { cx = cellX + w; cy = cellY + h; }
+  ctx.fillStyle = getWaveColor(instIdx);
+  ctx.fillRect(cx + 1, cy + 1, w - 2, h - 2);
+}
+
+function getWaveColor(i) {
+  const colors = ['#d32f2f', '#1976d2', '#388e3c', '#fbc02d'];
+  return colors[i % colors.length];
+}
+
+function redrawAll() {
+  clearCanvas();
+  drawHighlight(); // Draw highlight first (background layer)
+  drawGrid();
+  drawNotes();
+}
+
+// NEW: Helper to update label highlighting in the DOM
+function updateLabelHighlight() {
+  // Remove highlight from all labels
+  const highlightedLabels = document.querySelectorAll('.label-row.highlight');
+  highlightedLabels.forEach(el => el.classList.remove('highlight'));
+
+  // Add highlight to current row
+  if (hoverPitch >= 0 && hoverPitch < PITCHES.length) {
+    labelsCol.children[hoverPitch].classList.add('highlight');
+  }
+}
+
+/* -------------------------------------------------
+   INTERACTION (Mouse & Touch)
+   ------------------------------------------------- */
+
+function toggleNoteAt(x, y) {
+  const step = Math.floor(x / CELL_W);
+  const pitch = Math.floor(y / CELL_H);
+  if (step < 0 || step >= STEPS || pitch < 0 || pitch >= PITCHES.length) return;
+
+  const relX = x - step * CELL_W;
+  const relY = y - pitch * CELL_H;
+  const left = relX < CELL_W / 2;
+  const top = relY < CELL_H / 2;
+  const instIdx = (top ? 0 : 2) + (left ? 0 : 1);
+
+  notes[step][pitch] ^= (1 << instIdx);
+  redrawAll();
+}
+
+// --- Mouse Logic ---
+let isPanning = false;
+let panStartX, panStartY;
+let panStartScrollLeft, panStartScrollTop;
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  if (e.button === 2) { 
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    panStartScrollLeft = container.scrollLeft;
+    panStartScrollTop = container.scrollTop;
+    canvas.style.cursor = 'grabbing';
+  } else if (e.button === 0) { 
+    toggleNoteAt(mx, my);
+  }
+});
+
+window.addEventListener('mousemove', e => {
+  // Handle Panning
+  if (isPanning) {
+    const dx = e.clientX - panStartX;
+    const dy = e.clientY - panStartY;
+    container.scrollLeft = panStartScrollLeft - dx;
+    container.scrollTop = panStartScrollTop - dy;
+  }
+});
+
+// NEW: Handle Highlighting on Canvas movement
+canvas.addEventListener('mousemove', e => {
+  if (isPanning) return; // Don't highlight while panning
+
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  const s = Math.floor(mx / CELL_W);
+  const p = Math.floor(my / CELL_H);
+
+  if (s !== hoverStep || p !== hoverPitch) {
+    hoverStep = s;
+    hoverPitch = p;
+    redrawAll();
+    updateLabelHighlight();
+  }
+});
+
+// NEW: Clear highlight when mouse leaves
+canvas.addEventListener('mouseleave', () => {
+  hoverStep = -1;
+  hoverPitch = -1;
+  redrawAll();
+  updateLabelHighlight();
+});
+
+window.addEventListener('mouseup', () => {
+  if (isPanning) {
+    isPanning = false;
+    canvas.style.cursor = 'default';
+  }
+});
+
+// --- Touch Logic ---
+let lastTouchCenter = null;
+
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    toggleNoteAt(touch.clientX - rect.left, touch.clientY - rect.top);
+  } else if (e.touches.length === 2) {
+    lastTouchCenter = getTouchCenter(e.touches);
+  }
+  e.preventDefault(); 
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 2 && lastTouchCenter) {
+    const newCenter = getTouchCenter(e.touches);
+    const dx = newCenter.x - lastTouchCenter.x;
+    const dy = newCenter.y - lastTouchCenter.y;
+    container.scrollLeft -= dx;
+    container.scrollTop -= dy;
+    lastTouchCenter = newCenter;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  if (e.touches.length < 2) {
+    lastTouchCenter = null;
+  }
+});
+
+function getTouchCenter(touches) {
+  return {
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2
+  };
+}
+
+/* -------------------------------------------------
+   AUDIO UTILS
+   ------------------------------------------------- */
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const stepSec = (60 / TEMPO) / SUBDIV;
+
+function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+function pitchToMidi(idx) { return 24 + idx; }
+
+function scheduleNote(ctx, start, dur, pitchIdx, instIdx) {
+  const freq = midiToFreq(pitchToMidi(pitchIdx));
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const waveSel = document.getElementById(`wave${instIdx}`);
+  osc.type = waveSel.value;
+  osc.frequency.setValueAtTime(freq, start);
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(0.2, start + 0.01);
+  gain.gain.setValueAtTime(0.2, start + dur - 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.1);
+}
+
+/* -------------------------------------------------
+   PLAYBACK
+   ------------------------------------------------- */
+let playAnim = null;
+let playStart = null;
+let loopDuration = 0;
+
+function startPlayback() {
+  if (playAnim) { cancelAnimationFrame(playAnim); playAnim = null; }
+  let lastStep = -1;
+  for (let step = STEPS - 1; step >= 0; step--) {
+    if (notes[step].some(val => val > 0)) { lastStep = step; break; }
+  }
+  if (lastStep === -1) return;
+  loopDuration = (lastStep + 1) * stepSec;
+  if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  playStart = audioCtx.currentTime;
+  isPlaying = true;
+  const isHold = document.getElementById('hold').checked;
+  scheduleAllNotes(audioCtx, playStart, isHold, lastStep + 1);
+  drawPlayHead();
+}
+
+function scheduleAllNotes(ctx, startTime, isHold, limit = STEPS) {
+  for (let step = 0; step < limit; step++) {
+    const stepStart = startTime + step * stepSec;
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const currentMask = notes[step][pitch];
+      if (!currentMask) continue;
+      const prevMask = (step > 0) ? notes[step - 1][pitch] : 0;
+      for (let i = 0; i < 4; i++) {
+        const bit = 1 << i;
+        if (currentMask & bit) {
+          if (isHold) {
+            if (prevMask & bit) continue;
+            let length = 1;
+            for (let k = step + 1; k < limit; k++) {
+              if (notes[k][pitch] & bit) length++; else break;
+            }
+            scheduleNote(ctx, stepStart, length * stepSec, pitch, i);
+          } else {
+            scheduleNote(ctx, stepStart, stepSec * 0.9, pitch, i);
+          }
+        }
+      }
+    }
+  }
+}
+
+function drawPlayHead() {
+    const elapsed = audioCtx.currentTime - playStart;
+    if (elapsed >= loopDuration) {
+        const shouldLoop = document.getElementById('loop').checked;
+        if (shouldLoop) {
+            const isHold = document.getElementById('hold').checked;
+            const loopsPassed = Math.floor(elapsed / loopDuration);
+            const newStartTime = playStart + (loopsPassed * loopDuration);
+            scheduleAllNotes(audioCtx, newStartTime, isHold, loopDuration / stepSec);
+            playStart = newStartTime;
+            playAnim = requestAnimationFrame(drawPlayHead);
+            return;
+        } else {
+            stopPlayback(); return;
+        }
+    }
+    const posX = (elapsed / stepSec) * CELL_W;
+    redrawAll();
+    ctx.fillStyle = '#ff5722';
+    ctx.fillRect(posX, 0, 2, canvas.height);
+    playAnim = requestAnimationFrame(drawPlayHead);
+}
+
+function stopPlayback() {
+  if (playAnim) cancelAnimationFrame(playAnim);
+  playAnim = null;
+  if (audioCtx) audioCtx.close();
+  isPlaying = false;
+  playStart = null;
+  loopDuration = 0;
+  redrawAll();
+}
+
+/* -------------------------------------------------
+   EXPORT & CLEAR
+   ------------------------------------------------- */
+async function exportWav() {
+  stopPlayback();
+  const duration = STEPS * stepSec;
+  const sampleRate = 44100;
+  const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+  const isHold = document.getElementById('hold').checked;
+  scheduleAllNotes(offlineCtx, 0, isHold);
+  const renderedBuffer = await offlineCtx.startRendering();
+  const wavBlob = bufferToWave(renderedBuffer);
+  const url = URL.createObjectURL(wavBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rolidy_${new Date().toISOString()}.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function bufferToWave(abuffer) {
+  const numOfChan = abuffer.numberOfChannels;
+  const length = abuffer.length * numOfChan * 2 + 44;
+  const buffer = new ArrayBuffer(length);
+  const view = new DataView(buffer);
+  const channels = [];
+  let sample; let pos = 0; let offset = 0;
+  const setUint16 = (data) => { view.setUint16(pos, data, true); pos += 2; };
+  const setUint32 = (data) => { view.setUint32(pos, data, true); pos += 4; };
+  setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
+  setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
+  setUint32(abuffer.sampleRate); setUint32(abuffer.sampleRate * 2 * numOfChan);
+  setUint16(numOfChan * 2); setUint16(16);
+  setUint32(0x61746164); setUint32(length - pos - 4);
+  for (let i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+  while (pos < length) {
+    for (let i = 0; i < numOfChan; i++) {
+      sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+      view.setInt16(pos, sample, true); pos += 2;
+    }
+    offset++;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function clearGrid() {
+  if(confirm("Clear the grid?")) {
+    stopPlayback();
+    for (let step = 0; step < STEPS; step++) notes[step].fill(0);
+    redrawAll();
+  }
+}
+
+/* -------------------------------------------------
+   INIT
+   ------------------------------------------------- */
+const c4Index = PITCHES.indexOf('C4');
+if (c4Index !== -1) {
+  container.scrollTop = c4Index * CELL_H;
+}
+   
+redrawAll();
+document.getElementById('playBtn').addEventListener('click', startPlayback);
+document.getElementById('stopBtn').addEventListener('click', stopPlayback);
+document.getElementById('exportBtn').addEventListener('click', exportWav);
+document.getElementById('clearBtn').addEventListener('click', clearGrid);
+</script>
+</body>
+</html>

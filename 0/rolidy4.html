@@ -1,0 +1,530 @@
+<!--
+    Pressing spacebar starts playing or stops.
+    
+    Play during Playback stops but Play again starts from 1. please fix that.
+    
+    now the line does not restart...
+    
+    if I pause mid-melody then restart it plays what was unplayed (resumes) then plays again
+    
+    pressing Play twice does not restart from 0
+    
+    Give me the updated code segments.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rolidy 0.4</title>
+<style>
+  body {font-family:Arial,sans-serif;margin:0;padding:0;overflow:hidden;}
+  #toolbar {padding:10px;background:#222;color:#fff;display:flex;align-items:center;flex-wrap:wrap;}
+  #toolbar > * {margin-right:15px;}
+  
+  /* Main Layout: A single scrollable container */
+  #pianoRollContainer {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 50px);
+    overflow: auto; /* Enables both vertical and horizontal scrolling */
+    background: #fafafa;
+  }
+  
+  /* Inner wrapper to hold labels and canvas side-by-side */
+  #rollInner {
+    display: flex;
+    flex-direction: row;
+  }
+  
+  /* Labels Column */
+  #labelsCol {
+    width: 50px;
+    flex-shrink: 0; /* Prevents shrinking */
+    background: #f0f0f0;
+    z-index: 10;
+    
+    /* MAGIC: Sticks to the left when scrolling horizontally, 
+       but moves vertically with the content */
+    position: sticky; 
+    left: 0;
+    
+    border-right: 2px solid #999;
+    box-sizing: border-box;
+  }
+  
+  .label-row {
+    height: 20px;
+    line-height: 20px;
+    font-size: 10px;
+    text-align: right;
+    padding-right: 5px;
+    border-bottom: 1px solid #eee;
+    background: #f0f0f0; /* Must have background to hide grid scrolling behind it */
+    box-sizing: border-box;
+  }
+  
+  canvas {display: block;}
+  
+  #playBtn,#stopBtn,#clearBtn,#exportBtn{padding:5px 10px;border:none;color:#fff;cursor:pointer;}
+  #playBtn{background:green;color:white;}
+  #stopBtn{background:yellow;color:black;}
+  #clearBtn{background:red;color:black;}
+  #exportBtn{background:blue;color:white;}
+  select{padding:2px;}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <label>🟥
+    <select id="wave0"><option>sine</option><option selected>square</option><option>sawtooth</option><option>triangle</option></select>
+  </label>
+  <label>🟦
+    <select id="wave1"><option>sine</option><option>square</option><option selected>sawtooth</option><option>triangle</option></select>
+  </label>
+  <label>🟩
+    <select id="wave2"><option selected>sine</option><option>square</option><option>sawtooth</option><option>triangle</option></select>
+  </label>
+  <label>🟨
+    <select id="wave3"><option>triangle</option><option>square</option><option>sawtooth</option><option selected>sine</option></select>
+  </label>
+  
+  <label>Hold (Legato)
+    <input type="checkbox" id="hold" />
+  </label>
+
+  <button id="playBtn">▶ Play</button>
+  <button id="stopBtn">⏹ Stop</button>
+  <button id="exportBtn">Export</button>
+  <button id="clearBtn">Clear</button>
+</div>
+
+<div id="pianoRollContainer">
+  <div id="rollInner">
+    <div id="labelsCol"></div>
+    <canvas id="rollCanvas"></canvas>
+  </div>
+</div>
+
+<script>
+/* -------------------------------------------------
+   CONFIGURATION
+   ------------------------------------------------- */
+const PITCHES = [];
+// Generate C1 to B7
+for (let oct = 1; oct <= 7; oct++) {
+  const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  notes.forEach(n => PITCHES.push(n + oct));
+}
+
+const BEATS = 64;
+const SUBDIV = 4;
+const STEPS = BEATS * SUBDIV;
+const CELL_W = 40;
+const CELL_H = 20;
+const TEMPO = 120;
+let isPlaying = false;
+
+/* -------------------------------------------------
+   DATA MODEL
+   ------------------------------------------------- */
+const notes = Array.from({ length: STEPS }, () =>
+  new Uint8Array(PITCHES.length)
+);
+
+/* -------------------------------------------------
+   CANVAS & DOM SETUP
+   ------------------------------------------------- */
+const canvas = document.getElementById('rollCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = STEPS * CELL_W;
+canvas.height = PITCHES.length * CELL_H;
+
+const labelsCol = document.getElementById('labelsCol');
+
+// Populate Labels
+PITCHES.forEach(p => {
+  const div = document.createElement('div');
+  div.className = 'label-row';
+  div.innerText = p;
+  labelsCol.appendChild(div);
+});
+
+labelsCol.style.height = canvas.height + 'px';
+
+/* -------------------------------------------------
+   SPACEBAR CONTROL
+   ------------------------------------------------- */
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault(); // Prevent page scrolling
+    if (isPlaying) {
+      stopPlayback();
+    } else {
+      startPlayback();
+    }
+  }
+});
+
+/* -------------------------------------------------
+   DRAWING
+   ------------------------------------------------- */
+function clearCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawGrid() {
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 1;
+
+  // Vertical lines
+  for (let x = 0; x <= STEPS; x++) {
+    ctx.beginPath();
+    ctx.moveTo(x * CELL_W, 0);
+    ctx.lineTo(x * CELL_W, canvas.height);
+    ctx.stroke();
+  }
+
+  // Horizontal lines
+  for (let y = 0; y <= PITCHES.length; y++) {
+    ctx.beginPath();
+    ctx.moveTo(0, y * CELL_H);
+    ctx.lineTo(canvas.width, y * CELL_H);
+    ctx.stroke();
+  }
+
+  // Beat numbers
+  ctx.fillStyle = '#333';
+  ctx.font = '12px Arial';
+  ctx.textAlign = 'center';
+  for (let b = 0; b <= BEATS; b++) {
+    const x = b * CELL_W * SUBDIV + (CELL_W * SUBDIV) / 2;
+    ctx.fillText(b + 1, x, 14);
+  }
+}
+
+function drawNotes() {
+  for (let step = 0; step < STEPS; step++) {
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const mask = notes[step][pitch];
+      if (!mask) continue;
+
+      const x = step * CELL_W;
+      const y = pitch * CELL_H;
+
+      ctx.fillStyle = 'rgba(220, 220, 255, 0.3)';
+      ctx.fillRect(x, y, CELL_W, CELL_H);
+
+      for (let i = 0; i < 4; i++) {
+        if (mask & (1 << i)) drawCornerSquare(x, y, i);
+      }
+    }
+  }
+}
+
+function drawCornerSquare(cellX, cellY, instIdx) {
+  const w = CELL_W / 2;
+  const h = CELL_H / 2;
+  let cx = cellX;
+  let cy = cellY;
+
+  if (instIdx === 1) cx = cellX + w;
+  if (instIdx === 2) cy = cellY + h;
+  if (instIdx === 3) { cx = cellX + w; cy = cellY + h; }
+
+  ctx.fillStyle = getWaveColor(instIdx);
+  ctx.fillRect(cx + 1, cy + 1, w - 2, h - 2);
+}
+
+function getWaveColor(i) {
+  const colors = ['#d32f2f', '#1976d2', '#388e3c', '#fbc02d'];
+  return colors[i % colors.length];
+}
+
+function redrawAll() {
+  clearCanvas();
+  drawGrid();
+  drawNotes();
+}
+
+/* -------------------------------------------------
+   INTERACTION
+   ------------------------------------------------- */
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  const step = Math.floor(mx / CELL_W);
+  const pitch = Math.floor(my / CELL_H);
+  if (step < 0 || step >= STEPS || pitch < 0 || pitch >= PITCHES.length) return;
+
+  const relX = mx - step * CELL_W;
+  const relY = my - pitch * CELL_H;
+  const left = relX < CELL_W / 2;
+  const top = relY < CELL_H / 2;
+  const instIdx = (top ? 0 : 2) + (left ? 0 : 1);
+
+  notes[step][pitch] ^= (1 << instIdx);
+  redrawAll();
+});
+
+/* -------------------------------------------------
+   AUDIO UTILS
+   ------------------------------------------------- */
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const stepSec = (60 / TEMPO) / SUBDIV;
+
+function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+function pitchToMidi(idx) { return 24 + idx; }
+
+// Refactored to accept a specific AudioContext
+function scheduleNote(ctx, start, dur, pitchIdx, instIdx) {
+  const freq = midiToFreq(pitchToMidi(pitchIdx));
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  const waveSel = document.getElementById(`wave${instIdx}`);
+  osc.type = waveSel.value;
+
+  osc.frequency.setValueAtTime(freq, start);
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(0.2, start + 0.01);
+  gain.gain.setValueAtTime(0.2, start + dur - 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.1);
+}
+
+/* -------------------------------------------------
+   PLAYBACK
+   ------------------------------------------------- */
+let playAnim = null;
+let playStart = null;
+
+function startPlayback() {
+  // 1. Stop any current animation
+  if (playAnim) {
+    cancelAnimationFrame(playAnim);
+    playAnim = null;
+  }
+
+  // 2. Ensure a clean AudioContext.
+  // If it exists (running or suspended), close it first to kill all sound.
+  if (audioCtx && audioCtx.state !== 'closed') {
+    audioCtx.close();
+  }
+  
+  // Create a brand new context (Timeline starts at 0)
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  // 3. Set playStart to 0 (relative to the new context's creation)
+  playStart = audioCtx.currentTime;
+  
+  isPlaying = true;
+  
+  const isHold = document.getElementById('hold').checked;
+  
+  // Schedule notes on the fresh context
+  scheduleAllNotes(audioCtx, playStart, isHold);
+  
+  drawPlayHead();
+}
+
+// Core scheduling logic extracted for reuse
+function scheduleAllNotes(ctx, startTime, isHold) {
+  for (let step = 0; step < STEPS; step++) {
+    const stepStart = startTime + step * stepSec;
+    
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const currentMask = notes[step][pitch];
+      if (!currentMask) continue;
+
+      const prevMask = (step > 0) ? notes[step - 1][pitch] : 0;
+
+      for (let i = 0; i < 4; i++) {
+        const bit = 1 << i;
+        
+        if (currentMask & bit) {
+          if (isHold) {
+            if (prevMask & bit) continue;
+            
+            let length = 1;
+            for (let k = step + 1; k < STEPS; k++) {
+              if (notes[k][pitch] & bit) length++;
+              else break;
+            }
+            const dur = length * stepSec;
+            scheduleNote(ctx, stepStart, dur, pitch, i);
+            
+          } else {
+            const dur = stepSec * 0.9; 
+            scheduleNote(ctx, stepStart, dur, pitch, i);
+          }
+        }
+      }
+    }
+  }
+}
+
+function drawPlayHead() {
+    const elapsed = audioCtx.currentTime - playStart;
+    const posX = (elapsed / stepSec) * CELL_W;
+
+    redrawAll();
+    
+    ctx.fillStyle = '#ff5722';
+    ctx.fillRect(posX, 0, 2, canvas.height);
+
+    if (elapsed < STEPS * stepSec) {
+      playAnim = requestAnimationFrame(drawPlayHead);
+    } else {
+      stopPlayback();
+    }
+}
+
+function stopPlayback() {
+  if (playAnim) {
+    cancelAnimationFrame(playAnim);
+    playAnim = null;
+  }
+  
+  // FIX: Close the context completely.
+  // This kills all scheduled notes immediately and resets the audio timeline.
+  if (audioCtx) {
+    audioCtx.close();
+  }
+  
+  isPlaying = false;
+  playStart = null; // Reset time tracker
+  
+  redrawAll();
+}
+
+/* -------------------------------------------------
+   EXPORT TO WAV
+   ------------------------------------------------- */
+async function exportWav() {
+  // Stop real-time playback if running
+  stopPlayback();
+  
+  console.log("Rendering WAV...");
+  
+  const duration = STEPS * stepSec;
+  const sampleRate = 44100;
+  const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+  
+  const isHold = document.getElementById('hold').checked;
+  
+  // Schedule all notes in the offline context
+  // Note: We pass offlineCtx instead of audioCtx
+  scheduleAllNotes(offlineCtx, 0, isHold);
+  
+  try {
+    // Render the audio buffer
+    const renderedBuffer = await offlineCtx.startRendering();
+    
+    // Encode to WAV format
+    const wavBlob = bufferToWave(renderedBuffer);
+    
+    // Trigger download
+    const url = URL.createObjectURL(wavBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rolidy_${new Date().toISOString()}.wav`
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    console.log("Export Complete");
+  } catch (err) {
+    console.error("Export failed:", err);
+  }
+}
+
+// Helper: Convert AudioBuffer to WAV Blob
+function bufferToWave(abuffer) {
+  const numOfChan = abuffer.numberOfChannels;
+  const length = abuffer.length * numOfChan * 2 + 44;
+  const buffer = new ArrayBuffer(length);
+  const view = new DataView(buffer);
+  const channels = [];
+  let sample;
+  let pos = 0;
+  let offset = 0;
+
+  // Write WAVE header
+  setUint32(0x46464952); // "RIFF"
+  setUint32(length - 8); // file length - 8
+  setUint32(0x45564157); // "WAVE"
+
+  setUint32(0x20746d66); // "fmt " chunk
+  setUint32(16); // length = 16
+  setUint16(1); // PCM (uncompressed)
+  setUint16(numOfChan);
+  setUint32(abuffer.sampleRate);
+  setUint32(abuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
+  setUint16(numOfChan * 2); // block-align
+  setUint16(16); // 16-bit
+
+  setUint32(0x61746164); // "data" chunk
+  setUint32(length - pos - 4); // chunk length
+
+  // Write interleaved data
+  for (let i = 0; i < abuffer.numberOfChannels; i++) {
+    channels.push(abuffer.getChannelData(i));
+  }
+
+  while (pos < length) {
+    for (let i = 0; i < numOfChan; i++) { // interleave channels
+      sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale to 16-bit signed
+      view.setInt16(pos, sample, true);
+      pos += 2;
+    }
+    offset++; // next source sample
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' });
+
+  function setUint16(data) {
+    view.setUint16(pos, data, true);
+    pos += 2;
+  }
+  function setUint32(data) {
+    view.setUint32(pos, data, true);
+    pos += 4;
+  }
+}
+
+/* -------------------------------------------------
+   CLEAR GRID
+   ------------------------------------------------- */
+function clearGrid() {
+  let confirmation = confirm("Clear the grid?");
+  if(confirmation) {
+      // Stop audio before clearing
+      stopPlayback();
+      
+      // Reset data model
+      for (let step = 0; step < STEPS; step++) {
+        notes[step].fill(0);
+      }
+      
+      redrawAll();
+  }
+}
+
+/* -------------------------------------------------
+   INIT & EVENT LISTENERS
+   ------------------------------------------------- */
+redrawAll();
+
+document.getElementById('playBtn').addEventListener('click', startPlayback);
+document.getElementById('stopBtn').addEventListener('click', stopPlayback);
+document.getElementById('exportBtn').addEventListener('click', exportWav);
+document.getElementById('clearBtn').addEventListener('click', clearGrid);
+</script>
+</body>
+</html>
