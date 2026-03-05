@@ -1,0 +1,1199 @@
+<!--
+    When exporting you need to cut the melody to the last note, you alreaxdy detect where it ends.
+
+    Give me the updated code segments.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rolidy 2.0</title>
+<style>
+  .label-row:nth-child(even) {
+    background: var(--pair-row-bg);
+  }
+
+  :root {
+    --bg-color: #111111;
+    --toolbar-bg: #1e1e1e;
+    --toolbar-text: #ffffff;
+    --container-bg: #1a1a1a;
+    --labels-bg: #2a2a2a;
+    --label-border: #333333;
+    --grid-color: #222222;
+    --grid-text: #999999;
+    --highlight-color: rgba(100, 120, 180, 0.2);
+    --highlight-intersection: rgba(120, 140, 200, 0.2);
+    --label-highlight: rgba(100, 120, 180, 0.2);
+    --pair-row-bg: #151515; /* Dark mode alternating row color */
+    --modal-bg: rgba(0, 0, 0, 0.7);
+    --modal-content-bg: #2a2a2a;
+    --modal-border: #444444;
+    --modal-text: #ffffff;
+  }
+  
+  body.light-mode {
+    /* Light mode colors */
+    --bg-color: #ffffff;
+    --toolbar-bg: #f0f0f0;
+    --toolbar-text: #333333;
+    --container-bg: #fafafa;
+    --labels-bg: #f0f0f0;
+    --label-border: #dddddd;
+    --grid-color: #e0e0e0;
+    --grid-text: #666666;
+    --highlight-color: rgba(200, 220, 255, 0.4);
+    --highlight-intersection: rgba(180, 200, 255, 0.2);
+    --pair-row-bg: #e8e8e8; /* Light mode alternating row color */
+    --modal-bg: rgba(0, 0, 0, 0.5);
+    --modal-content-bg: #ffffff;
+    --modal-border: #cccccc;
+    --modal-text: #333333;
+  }
+  
+  body {font-family:Arial,sans-serif;margin:0;padding:0;overflow:hidden;background-color: var(--bg-color);color: var(--toolbar-text);}
+  #toolbar {padding:10px;background: var(--toolbar-bg);color: var(--toolbar-text);display:flex;align-items:center;flex-wrap:wrap;}
+  #toolbar > * {margin-right:15px;}
+  
+  /* Instrument button styles */
+  .instrument-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    display: inline-block;
+    margin-right: 5px;
+    overflow: hidden;
+  }
+  
+  .instrument-btn:hover {
+    transform: scale(1.1);
+  }
+  
+  /* Instrument icon styles */
+  .instrument-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 10px;
+    overflow: hidden;
+  }
+  
+  /* Half circle (Instrument 0) */
+  .inst0-icon::before {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 50%; /* Make it a full circle */
+    clip-path: inset(0 50% 0 0); /* Clip to show only the left half */
+    border-bottom: none;
+    left: 5px;
+    top: 0;
+  }
+  
+  /* One full circle (Instrument 1) */
+  .inst1-icon::before {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 50%;
+    left: 5px;
+    top: 0;
+  }
+  
+  /* One and a half circles (Instrument 2) */
+  .inst2-icon::before {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 10px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 6px 6px 0 0;
+    border-bottom: none;
+    left: 2px;
+    top: 0;
+  }
+  
+  .inst2-icon::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 10px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 50%; /* Make it a full circle */
+    clip-path: inset(0 50% 0 0); /* Clip to show only the left half */
+    border-bottom: none;
+    left: 12px;
+    top: 0;
+  }
+  
+  /* Two full circles (Instrument 3) */
+  .inst3-icon::before {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 50%;
+    left: 3px;
+    top: 2px;
+  }
+  
+  .inst3-icon::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 50%;
+    left: 11px;
+    top: 2px;
+  }
+  
+  /* Modal styles */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--modal-bg);
+  }
+  
+  .modal-content {
+    background-color: var(--modal-content-bg);
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid var(--modal-border);
+    border-radius: 5px;
+    width: 300px;
+    color: var(--modal-text);
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  
+  .close {
+    color: var(--modal-text);
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  
+  .close:hover {
+    opacity: 0.7;
+  }
+  
+  .form-group {
+    margin-bottom: 15px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 5px;
+  }
+  
+  .form-group select, .form-group input {
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+    background: var(--container-bg);
+    color: var(--modal-text);
+    border: 1px solid var(--modal-border);
+    border-radius: 3px;
+  }
+  
+  /* Main Layout: A single scrollable container */
+  #pianoRollContainer {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 50px);
+    overflow: auto; /* Enables both vertical and horizontal scrolling */
+    background: var(--container-bg);
+  }
+  
+  /* Inner wrapper to hold labels and canvas side-by-side */
+  #rollInner {
+    display: flex;
+    flex-direction: row;
+    margin-bottom: 20px; /* Adds space so the bottom scrollbar doesn't cover the last instruments */
+  }
+  
+  /* Labels Column */
+  #labelsCol {
+    width: 50px;
+    flex-shrink: 0; /* Prevents shrinking */
+    background: var(--labels-bg);
+    z-index: 10;
+    
+    /* MAGIC: Sticks to the left when scrolling horizontally, 
+       but moves vertically with the content */
+    position: sticky; 
+    left: 0;
+    
+    border-right: 2px solid var(--label-border);
+    box-sizing: border-box;
+  }
+  
+  .label-row {
+    height: 20px;
+    line-height: 20px;
+    font-size: 10px;
+    text-align: right;
+    padding-right: 5px;
+    border-bottom: 1px solid var(--label-border);
+    background: var(--labels-bg); /* Must have background to hide grid scrolling behind it */
+    box-sizing: border-box;
+  }
+  
+  .label-row.highlight {
+    background: var(--label-highlight);
+  }
+  
+  canvas {display: block;}
+  
+  #playBtn,#stopBtn,#clearBtn,#exportBtn{padding:5px 10px;border:none;color:#fff;cursor:pointer;}
+  #playBtn{background:green;color:white;}
+  #stopBtn{background:yellow;color:black;}
+  #clearBtn{background:red;color:black;}
+  #exportBtn{background:blue;color:white;}
+  select{padding:2px;}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <div class="instrument-btn" id="inst0Btn" style="background-color: #d32f2f;" title="Instrument 1">
+    <div class="instrument-icon inst0-icon"></div>
+  </div>
+  <div class="instrument-btn" id="inst1Btn" style="background-color: #1976d2;" title="Instrument 2">
+    <div class="instrument-icon inst1-icon"></div>
+  </div>
+  <div class="instrument-btn" id="inst2Btn" style="background-color: #388e3c;" title="Instrument 3">
+    <div class="instrument-icon inst2-icon"></div>
+  </div>
+  <div class="instrument-btn" id="inst3Btn" style="background-color: #fbc02d;" title="Instrument 4">
+    <div class="instrument-icon inst3-icon"></div>
+  </div>
+  
+  <button id="playBtn">▶ Play</button>
+  <button id="stopBtn">⏹ Stop</button>
+  <button id="exportBtn">Export</button>
+  <button id="clearBtn">Clear</button>
+  
+  <label>Loop
+    <input type="checkbox" id="loop" />
+  </label>
+
+  <label>Light
+    <input type="checkbox" id="lightMode" />
+  </label>
+</div>
+
+<!-- Instrument Settings Modal -->
+<div id="instrumentModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalTitle">Instrument Settings</h2>
+      <span class="close">&times;</span>
+    </div>
+    <div class="form-group">
+      <label for="modalWaveType">Type:</label>
+      <select id="modalWaveType">
+        <option value="sine">Sine</option>
+        <option value="square">Square</option>
+        <option value="sawtooth">Sawtooth</option>
+        <option value="triangle">Triangle</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="modalHold">Hold (Legato):</label>
+      <input type="checkbox" id="modalHold" />
+    </div>
+    <button id="saveInstrumentBtn" style="width: 100%; padding: 8px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">Save Settings</button>
+  </div>
+</div>
+
+<div id="pianoRollContainer">
+  <div id="rollInner">
+    <div id="labelsCol"></div>
+    <canvas id="rollCanvas"></canvas>
+  </div>
+</div>
+
+<script>
+/* -------------------------------------------------
+   CONFIGURATION
+   ------------------------------------------------- */
+const PITCHES = [];
+for (let oct = 1; oct <= 7; oct++) {
+  const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  notes.forEach(n => PITCHES.push(n + oct));
+}
+
+const BEATS = 64;
+const SUBDIV = 4;
+const STEPS = BEATS * SUBDIV;
+const CELL_W = 40;
+const CELL_H = 20;
+const TEMPO = 120;
+let isPlaying = false;
+
+/* -------------------------------------------------
+   UNDO / REDO STACKS
+   ------------------------------------------------- */
+const undoStack = [];   // holds previous grid snapshots
+const redoStack = [];   // holds snapshots undone by the user
+const MAX_STACK = 50;   // keep memory reasonable
+
+// Deep‑clone the whole notes matrix (Uint8Array rows)
+function cloneNotes() {
+  return notes.map(row => new Uint8Array(row));
+}
+
+// Push the current state onto the undo stack and clear redo stack
+function pushUndo() {
+  // If the stack is at capacity drop the oldest entry
+  if (undoStack.length >= MAX_STACK) undoStack.shift();
+  undoStack.push(cloneNotes());
+  // After a new edit redo is no longer valid
+  redoStack.length = 0;
+}
+
+/* -------------------------------------------------
+   DATA MODEL
+   ------------------------------------------------- */
+const notes = Array.from({ length: STEPS }, () =>
+  new Uint8Array(PITCHES.length)
+);
+
+// Instrument settings
+const instrumentSettings = [
+  { waveType: 'square', hold: false },
+  { waveType: 'sawtooth', hold: false },
+  { waveType: 'sine', hold: false },
+  { waveType: 'sine', hold: false }
+];
+
+let currentInstrument = 0; // Track which instrument is being edited
+
+/* -------------------------------------------------
+   CANVAS & DOM SETUP
+   ------------------------------------------------- */
+const canvas = document.getElementById('rollCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = STEPS * CELL_W;
+canvas.height = PITCHES.length * CELL_H;
+
+const labelsCol = document.getElementById('labelsCol');
+const container = document.getElementById('pianoRollContainer'); 
+
+PITCHES.forEach(p => {
+  const div = document.createElement('div');
+  div.className = 'label-row';
+  div.innerText = p;
+  labelsCol.appendChild(div);
+});
+labelsCol.style.height = canvas.height + 'px';
+
+/* -------------------------------------------------
+   INSTRUMENT MODAL
+   ------------------------------------------------- */
+const modal = document.getElementById('instrumentModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalWaveType = document.getElementById('modalWaveType');
+const modalHold = document.getElementById('modalHold');
+const saveInstrumentBtn = document.getElementById('saveInstrumentBtn');
+const closeBtn = document.getElementsByClassName('close')[0];
+
+// Set up click handlers for instrument buttons
+document.getElementById('inst0Btn').addEventListener('click', () => openInstrumentModal(0));
+document.getElementById('inst1Btn').addEventListener('click', () => openInstrumentModal(1));
+document.getElementById('inst2Btn').addEventListener('click', () => openInstrumentModal(2));
+document.getElementById('inst3Btn').addEventListener('click', () => openInstrumentModal(3));
+
+function openInstrumentModal(instIdx) {
+  currentInstrument = instIdx;
+  const colors = ['Red', 'Blue', 'Green', 'Yellow'];
+  modalTitle.textContent = `${colors[instIdx]} Instrument Settings`;
+  modalWaveType.value = instrumentSettings[instIdx].waveType;
+  modalHold.checked = instrumentSettings[instIdx].hold;
+  modal.style.display = 'block';
+}
+
+closeBtn.onclick = function() {
+  modal.style.display = 'none';
+}
+
+saveInstrumentBtn.onclick = function() {
+  instrumentSettings[currentInstrument].waveType = modalWaveType.value;
+  instrumentSettings[currentInstrument].hold = modalHold.checked;
+  modal.style.display = 'none';
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+  if (event.target == modal) {
+    modal.style.display = 'none';
+  }
+}
+
+/* -------------------------------------------------
+   DARK/LIGHT MODE TOGGLE
+   ------------------------------------------------- */
+const lightModeToggle = document.getElementById('lightMode');
+lightModeToggle.addEventListener('change', () => {
+  if (lightModeToggle.checked) {
+    document.body.classList.add('light-mode');
+  } else {
+    document.body.classList.remove('light-mode');
+  }
+  redrawAll();
+});
+
+/* -------------------------------------------------
+   SPACEBAR CONTROL
+   ------------------------------------------------- */
+/*window.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (isPlaying) stopPlayback();
+    else startPlayback();
+  }
+});*/
+
+/* -------------------------------------------------
+   DRAWING
+   ------------------------------------------------- */
+function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+function drawGrid() {
+  // Get the current colors from CSS variables
+  const gridColor = getComputedStyle(document.body).getPropertyValue('--grid-color').trim();
+  const gridTextColor = getComputedStyle(document.body).getPropertyValue('--grid-text').trim();
+  const pairRowBg = getComputedStyle(document.body).getPropertyValue('--pair-row-bg').trim();
+  
+  // Draw alternating row backgrounds on canvas
+  for (let y = 0; y < PITCHES.length; y++) {
+    if (y % 2 === 1) {
+      ctx.fillStyle = pairRowBg;
+      ctx.fillRect(0, y * CELL_H, canvas.width, CELL_H);
+    }
+  }
+  
+  // Draw grid lines
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= STEPS; x++) {
+    ctx.beginPath();
+    ctx.moveTo(x * CELL_W, 0);
+    ctx.lineTo(x * CELL_W, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= PITCHES.length; y++) {
+    ctx.beginPath();
+    ctx.moveTo(0, y * CELL_H);
+    ctx.lineTo(canvas.width, y * CELL_H);
+    ctx.stroke();
+  }
+  
+  // Draw beat numbers
+  ctx.fillStyle = gridTextColor;
+  ctx.font = '12px Arial';
+  ctx.textAlign = 'center';
+  for (let b = 0; b <= BEATS; b++) {
+    ctx.fillText(b + 1, b * CELL_W * SUBDIV + (CELL_W * SUBDIV) / 2, 14);
+  }
+}
+
+function redrawAll() {
+  clearCanvas();
+  drawGrid(); // Draw alternating rows and grid first
+  drawHighlight(); // Then draw hover highlight on top
+  drawNotes(); // Finally draw notes on top
+}
+
+// NEW: Variables to track cursor position
+let hoverStep = -1;
+let hoverPitch = -1;
+
+// NEW: Function to draw the row/column highlight
+function drawHighlight() {
+  if (hoverStep < 0 || hoverPitch < 0) return;
+
+  // Get the current highlight color from CSS variables
+  const highlightColor = getComputedStyle(document.body).getPropertyValue('--highlight-color').trim();
+  const highlightIntersection = getComputedStyle(document.body).getPropertyValue('--highlight-intersection').trim();
+
+  // Highlight Column
+  ctx.fillStyle = highlightColor;
+  ctx.fillRect(hoverStep * CELL_W, 0, CELL_W, canvas.height);
+
+  // Highlight Row
+  ctx.fillStyle = highlightColor;
+  ctx.fillRect(0, hoverPitch * CELL_H, canvas.width, CELL_H);
+  
+  // Highlight Intersection (optional, makes it pop)
+  ctx.fillStyle = highlightIntersection;
+  ctx.fillRect(hoverStep * CELL_W, hoverPitch * CELL_H, CELL_W, CELL_H);
+}
+
+function drawNotes() {
+  for (let step = 0; step < STEPS; step++) {
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const mask = notes[step][pitch];
+      if (!mask) continue;
+      const x = step * CELL_W;
+      const y = pitch * CELL_H;
+      for (let i = 0; i < 4; i++) {
+        if (mask & (1 << i)) drawCorner(x, y, i);
+      }
+    }
+  }
+}
+
+function undo() {
+  if (undoStack.length === 0) return;          // nothing to undo
+  // Move current state to redo stack
+  redoStack.push(cloneNotes());
+  // Restore the last saved state
+  const previous = undoStack.pop();
+  for (let i = 0; i < STEPS; i++) notes[i] = new Uint8Array(previous[i]);
+  redrawAll();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;          // nothing to redo
+  // Save current state so we can undo the redo later
+  undoStack.push(cloneNotes());
+  // Restore the next state
+  const next = redoStack.pop();
+  for (let i = 0; i < STEPS; i++) notes[i] = new Uint8Array(next[i]);
+  redrawAll();
+}
+
+/* -------------------------------------------------
+   DRAWING (Updated Section)
+   ------------------------------------------------- */
+
+function drawCorner(cellX, cellY, instIdx) {
+  const w = CELL_W / 2;
+  const h = CELL_H / 2;
+  let cx = cellX;
+  let cy = cellY;
+  if (instIdx === 1) cx = cellX + w;
+  if (instIdx === 2) cy = cellY + h;
+  if (instIdx === 3) { cx = cellX + w; cy = cellY + h; }
+  
+  // 1. Draw the existing colored square
+  ctx.fillStyle = getWaveColor(instIdx);
+  ctx.fillRect(cx + 1, cy + 1, w - 2, h - 2);
+
+  // 2. Draw the circles/arcs on top
+  const radius = Math.min(w, h) / 5; // Smaller radius
+  const fillColor = '#ffffff'; // White fill
+  const strokeColor = '#333333'; // Dark border
+  const centerY = cy + h / 2;
+
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1;
+
+  // Draw different shapes based on the instrument index
+  switch (instIdx) {
+    case 0: // Half a circle
+      ctx.beginPath();
+      // Draw an arc from 90deg to 270deg (a half-circle)
+      ctx.arc(cx + w / 2, centerY, radius, Math.PI / 2, Math.PI * 1.5);
+      ctx.fill();
+      ctx.stroke();
+      break;
+
+    case 1: // One full circle
+      ctx.beginPath();
+      ctx.arc(cx + w / 2, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      break;
+
+    case 2: // One and a half circles
+      // Full circle on the left
+      ctx.beginPath();
+      ctx.arc(cx + w / 3, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Half circle on the right
+      ctx.beginPath();
+      ctx.arc(cx + 2 * w / 3, centerY, radius, Math.PI / 2, Math.PI * 1.5);
+      ctx.fill();
+      ctx.stroke();
+      break;
+
+    case 3: // Two full circles
+      // First circle
+      ctx.beginPath();
+      ctx.arc(cx + w / 3, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Second circle
+      ctx.beginPath();
+      ctx.arc(cx + 2 * w / 3, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      break;
+  }
+}
+
+function getWaveColor(i) {
+  const colors = ['#d32f2f', '#1976d2', '#388e3c', '#fbc02d'];
+  return colors[i % colors.length];
+}
+
+function redrawAll() {
+  clearCanvas();             // 1. Clear everything
+  drawGrid();                // 2. Draw background, alternating rows, and grid lines
+  drawNotes();               // 3. Draw the notes on top of the grid
+  drawHighlight();           // 4. DRAW THE HIGHLIGHT LAST
+}
+
+// NEW: Helper to update label highlighting in the DOM
+function updateLabelHighlight() {
+  // Remove highlight from all labels
+  const highlightedLabels = document.querySelectorAll('.label-row.highlight');
+  highlightedLabels.forEach(el => el.classList.remove('highlight'));
+
+  // Add highlight to current row
+  if (hoverPitch >= 0 && hoverPitch < PITCHES.length) {
+    labelsCol.children[hoverPitch].classList.add('highlight');
+  }
+}
+
+/* -------------------------------------------------
+   INTERACTION (Mouse & Touch)
+   ------------------------------------------------- */
+
+// NEW: Variable to track if we're in drawing mode
+let isDrawing   = false;   // left‑mouse button is pressed
+let isDragging  = false;   // becomes true only after we detect real movement
+
+// Positions we need to compare
+let startX = 0, startY = 0;   // where the left‑click started
+const DRAG_THRESHOLD = 3;    // pixels – change if you want a tighter/looser feel
+
+function toggleNoteAt(x, y) {
+  const step = Math.floor(x / CELL_W);
+  const pitch = Math.floor(y / CELL_H);
+  if (step < 0 || step >= STEPS || pitch < 0 || pitch >= PITCHES.length) return;
+
+  // ---- RECORD FOR UNDO ----
+  pushUndo();                     // store the state *before* we change anything
+
+  const relX = x - step * CELL_W;
+  const relY = y - pitch * CELL_H;
+  const left = relX < CELL_W / 2;
+  const top = relY < CELL_H / 2;
+  const instIdx = (top ? 0 : 2) + (left ? 0 : 1);
+
+  notes[step][pitch] ^= (1 << instIdx);
+  redrawAll();
+}
+
+// -------------------------------------------------
+// Keyboard shortcuts for Undo / Redo
+// -------------------------------------------------
+/* -------------------------------------------------
+   KEYBOARD SHORTCUTS
+   ------------------------------------------------- */
+window.addEventListener('keydown', e => {
+  // -----------------------------------------------------------------
+  // 1️⃣  Ignore keystrokes that belong to form fields (inputs, selects, textarea)
+  // -----------------------------------------------------------------
+  const active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' ||
+                active.tagName === 'SELECT' ||
+                active.tagName === 'TEXTAREA')) {
+    return;   // let the user type normally
+  }
+
+  // -----------------------------------------------------------------
+  // 2️⃣  Undo / Redo (Z / Y) – same as before
+  // -----------------------------------------------------------------
+  if (e.key === 'z' || e.key === 'Z') {
+    e.preventDefault();   // stop the browser’s default (e.g., Chrome’s “undo”)
+    undo();
+    return;
+  }
+  if (e.key === 'y' || e.key === 'Y') {
+    e.preventDefault();
+    redo();
+    return;
+  }
+
+  // -----------------------------------------------------------------
+  // 3️⃣  Space‑bar – start / stop playback (the feature you lost)
+  // -----------------------------------------------------------------
+  if (e.code === 'Space') {
+    e.preventDefault();               // don’t scroll the page
+    if (isPlaying) stopPlayback();    // stop if it’s already playing
+    else startPlayback();             // otherwise start
+    return;
+  }
+
+  // -----------------------------------------------------------------
+  // 4️⃣  Ctrl + Arrow keys – pan the piano‑roll container
+  // -----------------------------------------------------------------
+  if (e.ctrlKey) {
+    const stepPx = 40;   // how many pixels to move per key press (adjust to taste)
+    switch (e.key) {
+      case 'ArrowUp':
+        container.scrollTop -= stepPx;
+        e.preventDefault();
+        break;
+      case 'ArrowDown':
+        container.scrollTop += stepPx;
+        e.preventDefault();
+        break;
+      case 'ArrowLeft':
+        container.scrollLeft -= stepPx;
+        e.preventDefault();
+        break;
+      case 'ArrowRight':
+        container.scrollLeft += stepPx;
+        e.preventDefault();
+        break;
+    }
+    // No need to fall through – we handled the key
+    return;
+  }
+
+  // -----------------------------------------------------------------
+  // (Any other keys are ignored here)
+  // -----------------------------------------------------------------
+});
+
+/* Show a grab cursor only when Ctrl is held */
+window.addEventListener('keydown', e => {
+  if (e.key === 'Control') canvas.style.cursor = 'grab';
+});
+window.addEventListener('keyup', e => {
+  if (e.key === 'Control') canvas.style.cursor = 'default';
+});
+
+/* -------------------------------------------------
+   INTERACTION (Mouse & Touch)
+   ------------------------------------------------- */
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+let isPanning = false;
+let panStartX, panStartY;
+let panStartScrollLeft, panStartScrollTop;
+
+/* Right‑click → panning – now requires Ctrl */
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  if (e.button === 2) {                 // right‑click
+    if (!e.ctrlKey) return;              // ← only start if Ctrl is pressed
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    panStartScrollLeft = container.scrollLeft;
+    panStartScrollTop = container.scrollTop;
+    canvas.style.cursor = 'grabbing';
+  } else if (e.button === 0) {          // left‑click → drawing (unchanged)
+    isDrawing = true;
+    isDragging = false;
+    startX = mx;
+    startY = my;
+  }
+});
+
+window.addEventListener('mousemove', e => {
+  // keep the very latest screen coordinates – used later on mouseup
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+
+  // ---------- PANNING (right‑click) ----------
+  if (isPanning) {
+    const dx = e.clientX - panStartX;
+    const dy = e.clientY - panStartY;
+    container.scrollLeft = panStartScrollLeft - dx;
+    container.scrollTop = panStartScrollTop - dy;
+    return;   // nothing else while we’re panning
+  }
+
+  // ---------- DRAWING (left‑click) ----------
+  if (!isDrawing) return;   // nothing to do if the button isn’t down
+
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  // Have we moved far enough to be considered a drag?
+  const distX = Math.abs(mx - startX);
+  const distY = Math.abs(my - startY);
+  if (!isDragging && (distX > DRAG_THRESHOLD || distY > DRAG_THRESHOLD)) {
+    isDragging = true;   // now we treat the whole motion as a drag
+  }
+
+  // While we are dragging, toggle continuously (the original behaviour)
+  if (isDragging) {
+    toggleNoteAt(mx, my);
+  }
+});
+
+// NEW: Handle Highlighting on Canvas movement
+canvas.addEventListener('mousemove', e => {
+  if (isPanning || isDrawing) return; // Don't highlight while panning or drawing
+
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  const s = Math.floor(mx / CELL_W);
+  const p = Math.floor(my / CELL_H);
+
+  if (s !== hoverStep || p !== hoverPitch) {
+    hoverStep = s;
+    hoverPitch = p;
+    redrawAll();
+    //updateLabelHighlight();
+  }
+});
+
+// NEW: Clear highlight when mouse leaves
+canvas.addEventListener('mouseleave', () => {
+  hoverStep = -1;
+  hoverPitch = -1;
+  redrawAll();
+  //updateLabelHighlight();
+});
+
+window.addEventListener('mouseup', () => {
+  // ---------- END PANNING ----------
+  if (isPanning) {
+    isPanning = false;
+    canvas.style.cursor = 'default';
+  }
+
+  // ---------- END DRAWING ----------
+  if (isDrawing) {
+    // If we never crossed the drag‑threshold, this was a simple click.
+    // Toggle once at the point where the mouse was released.
+    if (!isDragging) {
+      const rect = canvas.getBoundingClientRect();
+      const mx = lastMouseX - rect.left;
+      const my = lastMouseY - rect.top;
+      toggleNoteAt(mx, my);
+    }
+
+    // Reset flags for the next press
+    isDrawing   = false;
+    isDragging  = false;
+    startX = startY = 0;
+  }
+});
+
+let lastMouseX = 0, lastMouseY = 0;
+window.addEventListener('mousemove', e => {
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+  // … existing code …
+});
+
+// --- Touch Logic ---
+let lastTouchCenter = null;
+
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    toggleNoteAt(touch.clientX - rect.left, touch.clientY - rect.top);
+  } else if (e.touches.length === 2) {
+    lastTouchCenter = getTouchCenter(e.touches);
+  }
+  e.preventDefault(); 
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 1) {
+    // NEW: Support drag to toggle with touch
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    toggleNoteAt(touch.clientX - rect.left, touch.clientY - rect.top);
+  } else if (e.touches.length === 2 && lastTouchCenter) {
+    const newCenter = getTouchCenter(e.touches);
+    const dx = newCenter.x - lastTouchCenter.x;
+    const dy = newCenter.y - lastTouchCenter.y;
+    container.scrollLeft -= dx;
+    container.scrollTop -= dy;
+    lastTouchCenter = newCenter;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  if (e.touches.length < 2) {
+    lastTouchCenter = null;
+  }
+});
+
+function getTouchCenter(touches) {
+  return {
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2
+  };
+}
+
+/* -------------------------------------------------
+   AUDIO UTILS
+   ------------------------------------------------- */
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const stepSec = (60 / TEMPO) / SUBDIV;
+
+function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+function pitchToMidi(idx) { return 24 + idx; }
+
+function scheduleNote(ctx, start, dur, pitchIdx, instIdx) {
+  const freq = midiToFreq(pitchToMidi(pitchIdx));
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = instrumentSettings[instIdx].waveType;
+  osc.frequency.setValueAtTime(freq, start);
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(0.2, start + 0.01);
+  gain.gain.setValueAtTime(0.2, start + dur - 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.1);
+}
+
+/* -------------------------------------------------
+   PLAYBACK
+   ------------------------------------------------- */
+let playAnim = null;
+let playStart = null;
+let loopDuration = 0;
+
+// NEW: Function to find the last step with a note
+function findLastStep() {
+  let lastStep = -1;
+  for (let step = STEPS - 1; step >= 0; step--) {
+    if (notes[step].some(val => val > 0)) { 
+      lastStep = step; 
+      break; 
+    }
+  }
+  return lastStep;
+}
+
+// NEW: Function to update the loop duration based on the last note
+function updateLoopDuration() {
+  const lastStep = findLastStep();
+  if (lastStep === -1) return 0; // No notes found
+  return (lastStep + 1) * stepSec;
+}
+
+function startPlayback() {
+  if (playAnim) { 
+    cancelAnimationFrame(playAnim); 
+    playAnim = null; 
+  }
+  
+  // Update loop duration when starting playback
+  loopDuration = updateLoopDuration();
+  if (loopDuration === 0) return; // No notes to play
+  
+  if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  playStart = audioCtx.currentTime;
+  isPlaying = true;
+  const lastStep = findLastStep();
+  scheduleAllNotes(audioCtx, playStart, lastStep + 1);
+  drawPlayHead();
+}
+
+function scheduleAllNotes(ctx, startTime, limit = STEPS) {
+  for (let step = 0; step < limit; step++) {
+    const stepStart = startTime + step * stepSec;
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const currentMask = notes[step][pitch];
+      if (!currentMask) continue;
+      const prevMask = (step > 0) ? notes[step - 1][pitch] : 0;
+      for (let i = 0; i < 4; i++) {
+        const bit = 1 << i;
+        if (currentMask & bit) {
+          if (instrumentSettings[i].hold) {
+            if (prevMask & bit) continue;
+            let length = 1;
+            for (let k = step + 1; k < limit; k++) {
+              if (notes[k][pitch] & bit) length++; else break;
+            }
+            scheduleNote(ctx, stepStart, length * stepSec, pitch, i);
+          } else {
+            scheduleNote(ctx, stepStart, stepSec * 0.9, pitch, i);
+          }
+        }
+      }
+    }
+  }
+}
+
+function drawPlayHead() {
+    const elapsed = audioCtx.currentTime - playStart;
+    if (elapsed >= loopDuration) {
+        const shouldLoop = document.getElementById('loop').checked;
+        if (shouldLoop) {
+            // Recalculate loop duration on each reset
+            const newLoopDuration = updateLoopDuration();
+            if (newLoopDuration === 0) {
+                stopPlayback();
+                return;
+            }
+            
+            const loopsPassed = Math.floor(elapsed / loopDuration);
+            const newStartTime = playStart + (loopsPassed * loopDuration);
+            
+            // Update loop duration for the next iteration
+            loopDuration = newLoopDuration;
+            
+            // Schedule notes for the next loop
+            const lastStep = findLastStep();
+            scheduleAllNotes(audioCtx, newStartTime, lastStep + 1);
+            playStart = newStartTime;
+            playAnim = requestAnimationFrame(drawPlayHead);
+            return;
+        } else {
+            stopPlayback(); 
+            return;
+        }
+    }
+    const posX = (elapsed / stepSec) * CELL_W;
+    redrawAll();
+    ctx.fillStyle = '#ff5722';
+    ctx.fillRect(posX, 0, 2, canvas.height);
+    playAnim = requestAnimationFrame(drawPlayHead);
+}
+
+function stopPlayback() {
+  if (playAnim) cancelAnimationFrame(playAnim);
+  playAnim = null;
+  if (audioCtx) audioCtx.close();
+  isPlaying = false;
+  playStart = null;
+  loopDuration = 0;
+  redrawAll();
+}
+
+/* -------------------------------------------------
+   EXPORT & CLEAR
+   ------------------------------------------------- */
+async function exportWav() {
+  stopPlayback();
+  
+  // 1. Find the last step that contains a note
+  const lastStep = findLastStep();
+  
+  // 2. If no notes are found, alert the user and exit
+  if (lastStep === -1) {
+    alert("No notes to export!");
+    return;
+  }
+  
+  // 3. Calculate the precise duration required
+  // (lastStep is 0-based, so we add 1 to get the total step count)
+  // We add 0.1s padding to ensure the final release tail isn't cut off abruptly.
+  const duration = (lastStep + 1) * stepSec + 0.1;
+  
+  const sampleRate = 44100;
+  
+  // 4. Create the OfflineAudioContext with the calculated duration
+  const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+  
+  // 5. Schedule notes only up to the detected limit
+  // (passing lastStep + 1 because the function expects an exclusive limit)
+  scheduleAllNotes(offlineCtx, 0, lastStep + 1);
+  
+  const renderedBuffer = await offlineCtx.startRendering();
+  const wavBlob = bufferToWave(renderedBuffer);
+  const url = URL.createObjectURL(wavBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rolidy_${new Date().toISOString()}.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function bufferToWave(abuffer) {
+  const numOfChan = abuffer.numberOfChannels;
+  const length = abuffer.length * numOfChan * 2 + 44;
+  const buffer = new ArrayBuffer(length);
+  const view = new DataView(buffer);
+  const channels = [];
+  let sample; let pos = 0; let offset = 0;
+  const setUint16 = (data) => { view.setUint16(pos, data, true); pos += 2; };
+  const setUint32 = (data) => { view.setUint32(pos, data, true); pos += 4; };
+  setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
+  setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
+  setUint32(abuffer.sampleRate); setUint32(abuffer.sampleRate * 2 * numOfChan);
+  setUint16(numOfChan * 2); setUint16(16);
+  setUint32(0x61746164); setUint32(length - pos - 4);
+  for (let i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+  while (pos < length) {
+    for (let i = 0; i < numOfChan; i++) {
+      sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+      view.setInt16(pos, sample, true); pos += 2;
+    }
+    offset++;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function clearGrid() {
+  if(confirm("Clear the grid?")) {
+    stopPlayback();
+    for (let step = 0; step < STEPS; step++) notes[step].fill(0);
+    redrawAll();
+  }
+}
+
+/* -------------------------------------------------
+   INIT
+   ------------------------------------------------- */
+const c4Index = PITCHES.indexOf('C4');
+if (c4Index !== -1) {
+  container.scrollTop = c4Index * CELL_H;
+}
+   
+redrawAll();
+document.getElementById('playBtn').addEventListener('click', startPlayback);
+document.getElementById('stopBtn').addEventListener('click', stopPlayback);
+document.getElementById('exportBtn').addEventListener('click', exportWav);
+document.getElementById('clearBtn').addEventListener('click', clearGrid);
+</script>
+</body>
+</html>
