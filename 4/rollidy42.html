@@ -1,0 +1,2330 @@
+<!--
+    Human Intervention:
+        - Inst # => Instrument # (on Generator)
+        - Switched the Generator Octave: section to numeric drop-downs
+        
+    Update the CSS to place Minimum and Maximum Octave side-by-side.
+    
+    Human Intervention:
+        - Made the Generator more compact while keeping all controls
+        - Switched drop-downs for numeric inputs
+    
+    Give me the updated code segments.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rolldiy 4.2</title>
+<style>
+  .label-row:nth-child(even) {
+    background: var(--pair-row-bg);
+  }
+
+  :root {
+    --bg-color: #111111;
+    --toolbar-bg: #1e1e1e;
+    --toolbar-text: #ffffff;
+    --container-bg: #1a1a1a;
+    --labels-bg: #2a2a2a;
+    --label-border: #333333;
+    --grid-color: #222222;
+    --grid-text: #999999;
+    --highlight-color: rgba(100, 120, 180, 0.2);
+    --highlight-intersection: rgba(120, 140, 200, 0.2);
+    --label-highlight: rgba(100, 120, 180, 0.2);
+    --pair-row-bg: #151515; 
+    --modal-bg: rgba(0, 0, 0, 0.7);
+    --modal-content-bg: #2a2a2a;
+    --modal-border: #444444;
+    --modal-text: #ffffff;
+  }
+  
+  body.light-mode {
+    --bg-color: #ffffff;
+    --toolbar-bg: #f0f0f0;
+    --toolbar-text: #333333;
+    --container-bg: #fafafa;
+    --labels-bg: #f0f0f0;
+    --label-border: #dddddd;
+    --grid-color: #e0e0e0;
+    --grid-text: #666666;
+    --highlight-color: rgba(200, 220, 255, 0.4);
+    --highlight-intersection: rgba(180, 200, 255, 0.2);
+    --pair-row-bg: #e8e8e8; 
+    --modal-bg: rgba(0, 0, 0, 0.5);
+    --modal-content-bg: #ffffff;
+    --modal-border: #cccccc;
+    --modal-text: #333333;
+  }
+  
+  body {font-family:Arial,sans-serif;margin:0;padding:0;overflow:hidden;background-color: var(--bg-color);color: var(--toolbar-text);}
+  #toolbar {padding:10px;background: var(--toolbar-bg);color: var(--toolbar-text);display:flex;align-items:center;flex-wrap:wrap;}
+  #toolbar > * {margin-right:15px;}
+  
+  .instrument-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    display: inline-block;
+    margin-right: 5px;
+    overflow: hidden;
+  }
+  
+  .instrument-btn:hover { transform: scale(1.1); }
+  
+  .instrument-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 10px;
+    overflow: hidden;
+  }
+  
+  .inst0-icon::before {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 50%; 
+    clip-path: inset(0 50% 0 0); 
+    border-bottom: none;
+    left: 5px;
+    top: 0;
+  }
+  
+  .inst1-icon::before {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 50%;
+    left: 5px;
+    top: 0;
+  }
+  
+  .inst2-icon::before {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 10px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 6px 6px 0 0;
+    border-bottom: none;
+    left: 2px;
+    top: 0;
+  }
+  
+  .inst2-icon::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 10px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 50%; 
+    clip-path: inset(0 50% 0 0); 
+    border-bottom: none;
+    left: 12px;
+    top: 0;
+  }
+  
+  .inst3-icon::before {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 50%;
+    left: 3px;
+    top: 2px;
+  }
+  
+  .inst3-icon::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 50%;
+    left: 11px;
+    top: 2px;
+  }
+  
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--modal-bg);
+  }
+  
+  .modal-content {
+    background-color: var(--modal-content-bg);
+    margin: 10% auto;
+    padding: 20px;
+    border: 1px solid var(--modal-border);
+    border-radius: 5px;
+    width: 350px; 
+    color: var(--modal-text);
+  }
+  
+  #melodyModal .modal-content {
+    width: 450px;
+    max-width: 90%;
+    display: flex;
+    flex-direction: column;
+    max-height: 80vh;
+  }
+
+  #melodyTableContainer {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    border: 1px solid var(--label-border);
+    max-height: 300px;
+  }
+
+  #melodyTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  #melodyTable th, #melodyTable td {
+    padding: 6px;
+    text-align: left;
+    border-bottom: 1px solid var(--label-border);
+  }
+  
+  #melodyTable th {
+    background: var(--labels-bg);
+    position: sticky;
+    top: 0;
+  }
+  
+  #melodyTable tr:nth-child(even) {
+    background: var(--pair-row-bg);
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  
+  .close {
+    color: var(--modal-text);
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  
+  .close:hover { opacity: 0.7; }
+  
+  .form-group {
+    margin-bottom: 15px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 5px;
+  }
+  
+  .form-group select, .form-group input {
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+    background: var(--container-bg);
+    color: var(--modal-text);
+    border: 1px solid var(--modal-border);
+    border-radius: 3px;
+  }
+  
+  .form-group.side-by-side {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .form-group.side-by-side label {
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+  
+  .form-group.side-by-side select {
+    flex-grow: 1;
+  }
+  
+  #waveCanvas {
+    background: #000;
+    border: 1px solid #444;
+    width: 100%;
+    height: 100px;
+    cursor: crosshair;
+    touch-action: none;
+    display: block;
+  }
+  
+  .wave-container {
+    margin-top: 10px;
+    position: relative;
+  }
+  
+  .wave-center-line {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: #333;
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  #pianoRollContainer {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 50px);
+    display: flex;
+    background: var(--container-bg);
+    overflow: hidden;
+  }
+  
+  #labelsCol {
+    width: 50px;
+    flex-shrink: 0;
+    background: var(--labels-bg);
+    z-index: 10;
+    border-right: 2px solid var(--label-border);
+    box-sizing: border-box;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+  
+  #labelsCol::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .label-row {
+    height: 20px;
+    line-height: 20px;
+    font-size: 10px;
+    text-align: right;
+    padding-right: 5px;
+    border-bottom: 1px solid var(--label-border);
+    background: var(--labels-bg); 
+    box-sizing: border-box;
+  }
+  
+  .label-row.highlight { background: var(--label-highlight); }
+  
+  #canvasScroller {
+    flex-grow: 1;
+    height: 100%;
+    overflow: auto;
+    position: relative;
+  }
+
+  canvas {display: block;}
+  
+  #playBtn,#stopBtn,#clearBtn,#generateBtn{padding:5px 10px;border:none;color:#fff;cursor:pointer;}
+  #playBtn{background:green;color:white;}
+  #stopBtn{background:yellow;color:black;}
+  #clearBtn{background:red;color:black;}
+  #generateBtn{background:blue;olor:white;}
+  select{padding:2px;}
+
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  
+  .btn-row button {
+    padding: 8px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    background: var(--toolbar-bg);
+    color: var(--toolbar-text);
+    border: 1px solid var(--label-border);
+  }
+  
+  .btn-row button:hover {
+    background: var(--label-border);
+  }
+</style>
+<script>
+/* -------------------------------------------------
+   INSTRUMENT STYLE DICTIONARY
+   ------------------------------------------------- */
+const STYLE = {};
+
+// Base class
+class InstrumentStyle {
+  constructor(name, value, options = {}) {
+    this.name = name;
+    this.value = value;
+    this.options = {
+      hold: options.hold || false,
+      customWave: options.customWave || false
+    };
+  }
+  
+  createOscillator(ctx, freq, options = {}) {
+    const osc = ctx.createOscillator();
+    osc.frequency.value = freq;
+    return osc;
+  }
+}
+
+// 1. Mute: No controls
+STYLE.mute = class extends InstrumentStyle {
+  constructor() { 
+    super("Mute", "mute", { hold: false, customWave: false }); 
+  }
+  createOscillator(ctx, freq, options) {
+    return null; 
+  }
+};
+
+// 2. Sine: Has Hold
+STYLE.sine = class extends InstrumentStyle {
+  constructor() { 
+    super("Sine", "sine", { hold: true, customWave: false }); 
+  }
+  createOscillator(ctx, freq, options) {
+    const osc = super.createOscillator(ctx, freq, options);
+    osc.type = 'sine';
+    return osc;
+  }
+};
+
+// 3. Square: Has Hold
+STYLE.square = class extends InstrumentStyle {
+  constructor() { 
+    super("Square", "square", { hold: true, customWave: false }); 
+  }
+  createOscillator(ctx, freq, options) {
+    const osc = super.createOscillator(ctx, freq, options);
+    osc.type = 'square';
+    return osc;
+  }
+};
+
+// 4. Sawtooth: Has Hold
+STYLE.sawtooth = class extends InstrumentStyle {
+  constructor() { 
+    super("Sawtooth", "sawtooth", { hold: true, customWave: false }); 
+  }
+  createOscillator(ctx, freq, options) {
+    const osc = super.createOscillator(ctx, freq, options);
+    osc.type = 'sawtooth';
+    return osc;
+  }
+};
+
+// 5. Triangle: Has Hold
+STYLE.triangle = class extends InstrumentStyle {
+  constructor() { 
+    super("Triangle", "triangle", { hold: true, customWave: false }); 
+  }
+  createOscillator(ctx, freq, options) {
+    const osc = super.createOscillator(ctx, freq, options);
+    osc.type = 'triangle';
+    return osc;
+  }
+};
+
+// 6. Custom: Has Custom Wave, No Hold
+STYLE.custom = class extends InstrumentStyle {
+  constructor() { 
+    super("Custom (Draw)", "custom", { hold: false, customWave: true }); 
+  }
+  createOscillator(ctx, freq, options) {
+    const osc = super.createOscillator(ctx, freq, options);
+    if (options.customCoeffs) {
+      const wave = ctx.createPeriodicWave(
+        options.customCoeffs.real, 
+        options.customCoeffs.imag
+      );
+      osc.setPeriodicWave(wave);
+    } else {
+      osc.type = 'sine'; 
+    }
+    return osc;
+  }
+};
+
+// -- Helpers --
+
+const styleCache = {};
+
+function getStyle(key) {
+  if (!STYLE[key]) {
+      console.warn(`Style "${key}" not found. Defaulting to Mute.`);
+      return getStyle('mute');
+  }
+  
+  if (!styleCache[key]) {
+    try {
+      styleCache[key] = new STYLE[key]();
+    } catch (e) {
+      console.error(`Error creating style ${key}`, e);
+      return null;
+    }
+  }
+  return styleCache[key];
+}
+
+function getStyleByValue(value) {
+  const key = Object.keys(STYLE).find(k => {
+    const inst = getStyle(k);
+    return inst && inst.value === value;
+  });
+  
+  return key ? getStyle(key) : null;
+}
+
+function populateWaveTypeSelector() {
+  const select = document.getElementById('modalStyle');
+  if (!select) return;
+  
+  select.innerHTML = '';
+  
+  Object.keys(STYLE).forEach(key => {
+    const instance = getStyle(key);
+    if (instance) {
+      const option = document.createElement('option');
+      option.value = instance.value;
+      option.textContent = instance.name;
+      select.appendChild(option);
+    }
+  });
+}
+</script>
+</head>
+<body>
+<div id="toolbar">
+  <div class="instrument-btn" id="inst0Btn" style="background-color: #d32f2f;" title="Instrument 1">
+    <div class="instrument-icon inst0-icon"></div>
+  </div>
+  <div class="instrument-btn" id="inst1Btn" style="background-color: #1976d2;" title="Instrument 2">
+    <div class="instrument-icon inst1-icon"></div>
+  </div>
+  <div class="instrument-btn" id="inst2Btn" style="background-color: #388e3c;" title="Instrument 3">
+    <div class="instrument-icon inst2-icon"></div>
+  </div>
+  <div class="instrument-btn" id="inst3Btn" style="background-color: #fbc02d;" title="Instrument 4">
+    <div class="instrument-icon inst3-icon"></div>
+  </div>
+  
+  <button id="playBtn">▶ Play</button>
+  <!-- FIX: Added explicit onclick handler for Stop -->
+  <button id="stopBtn" onclick="stopPlayback()">⏹ Stop</button>
+  <button id="generateBtn">Generate</button>
+  <!-- FIX: Added explicit onclick handler for Clear -->
+  <button id="clearBtn" onclick="clearGrid()">Clear</button>
+  
+  <label>BPM <input type="number" id="bpmInput" value="120" min="20" max="300" style="width: 50px;"></label>
+
+  <label>Loop
+    <input type="checkbox" id="loop" />
+  </label>
+
+  <label>Light
+    <input type="checkbox" id="lightMode" />
+  </label>
+</div>
+
+<div id="instrumentModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalTitle">Instrument Settings</h2>
+      <span class="close">&times;</span>
+    </div>
+    <div class="form-group">
+      <label for="modalStyle">Style:</label>
+      <select id="modalStyle">
+        <!-- Options populated by JS -->
+      </select>
+    </div>
+    
+    <div class="form-group" id="customWaveGroup" style="display:none;">
+      <label>Draw Waveform:</label>
+      <div class="wave-container">
+        <div class="wave-center-line"></div>
+        <canvas id="waveCanvas" width="256" height="100"></canvas>
+      </div>
+      <div class="btn-row" style="margin-top:5px; grid-template-columns: 1fr;">
+        <button id="resetWaveBtn">Reset (Sine)</button>
+      </div>
+    </div>
+
+<div class="form-group" id="holdControlGroup">
+  <label for="modalHold">Hold (Legato):</label>
+  <input type="checkbox" id="modalHold" />
+</div>
+    <button id="saveInstrumentBtn" style="width: 100%; padding: 8px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">Save Settings</button>
+  </div>
+</div>
+
+<div id="melodyModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Recorded Melody</h2>
+      <span class="close" id="closeMelody">&times;</span>
+    </div>
+    <div id="melodyTableContainer">
+      <table id="melodyTable">
+        <thead>
+          <tr>
+            <th>Note</th>
+            <th>Freq. (Hz)</th>
+            <th>Time (ms)</th>
+            <th>Dur. (ms)</th>
+          </tr>
+        </thead>
+        <tbody id="melodyTableBody">
+        </tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button id="importJsonBtn">Import JSON</button>
+      <button id="importAudioBtn">Import Audio</button>
+      <button id="exportJsonBtn">Export JSON</button>
+      <button id="exportAudioBtn">Export Audio</button>
+    </div>
+    <input type="file" id="jsonFileInput" accept=".json" style="display:none">
+    <input type="file" id="audioFileInput" accept="audio/*" style="display:none">
+  </div>
+</div>
+
+<div id="generateModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Procedural Generation</h2>
+      <span class="close">&times;</span>
+    </div>
+    <div class="form-group">
+      <label for="genInstrument">Target Instrument:</label>
+      <select id="genInstrument">
+        <option value="0">Instrument 1 (Red)</option>
+        <option value="1">Instrument 2 (Blue)</option>
+        <option value="2">Instrument 3 (Green)</option>
+        <option value="3">Instrument 4 (Yellow)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="genDensity">Note Density (%):</label>
+      <input type="range" id="genDensity" min="5" max="80" value="25" style="width: 80%;">
+      <span id="genDensityVal">25%</span>
+    </div>
+    <div class="form-group">
+      <label for="genKey">Root Key:</label>
+      <select id="genKey">
+        <option value="0">C</option><option value="1">C#/Db</option>
+        <option value="2">D</option><option value="3">D#/Eb</option>
+        <option value="4">E</option><option value="5">F</option>
+        <option value="6">F#/Gb</option><option value="7">G</option>
+        <option value="8">G#/Ab</option><option value="9">A</option>
+        <option value="10">A#/Bb</option><option value="11">B</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="genScale">Scale:</label>
+      <select id="genScale">
+        <option value="major">Major</option>
+        <option value="minor">Minor</option>
+        <option value="pentMinor">Pentatonic Minor</option>
+        <option value="blues">Blues</option>
+        <option value="chromatic">Chromatic</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="genOctave">Octave</label>
+      <div id="genOctave" class="form-group side-by-side">
+          <label for="genOctaveMin">Minimum:</label>
+                      
+          <input type="number" id="genOctaveMin" min="1" max="7" value="3" />
+          <label for="genOctaveMax">Maximum:</label>
+          <input type="number" id="genOctaveMax" min="1" max="7" value="4" />
+        </div>
+    </div>
+    <button id="doGenerateBtn" style="width: 100%; padding: 10px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer; font-weight: bold;">Generate Melody</button>
+  </div>
+</div>
+
+<div id="pianoRollContainer">
+  <div id="labelsCol"></div>
+  <div id="canvasScroller">
+    <canvas id="rollCanvas"></canvas>
+  </div>
+</div>
+
+<script>
+/* -------------------------------------------------
+   CONFIGURATION
+   ------------------------------------------------- */
+const PITCHES = [];
+for (let oct = 1; oct <= 7; oct++) {
+  const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  notes.forEach(n => PITCHES.push(n + oct));
+}
+
+const BEATS = 64;
+const SUBDIV = 4;
+const STEPS = BEATS * SUBDIV;
+const CELL_W = 40;
+const CELL_H = 20;
+
+let TEMPO = 120; 
+let stepSec = (60 / TEMPO) / SUBDIV;
+let isPlaying = false;
+let playRequestId = 0;
+
+/* -------------------------------------------------
+   UNDO / REDO STACKS
+   ------------------------------------------------- */
+const undoStack = [];   
+const redoStack = [];   
+const MAX_STACK = 50;   
+
+function cloneNotes() {
+  return notes.map(row => new Uint8Array(row));
+}
+
+function pushUndo() {
+  if (undoStack.length >= MAX_STACK) undoStack.shift();
+  undoStack.push(cloneNotes());
+  redoStack.length = 0;
+}
+
+/* -------------------------------------------------
+   CLIPBOARD
+   ------------------------------------------------- */
+let clipboard = []; 
+
+/* -------------------------------------------------
+   BPM CHANGE HANDLER
+   ------------------------------------------------- */
+const bpmInput = document.getElementById('bpmInput');
+
+function updateTempo(newTempo) {
+  const val = parseInt(newTempo);
+  if (isNaN(val) || val < 20) TEMPO = 20;
+  else if (val > 300) TEMPO = 300;
+  else TEMPO = val;
+  stepSec = (60 / TEMPO) / SUBDIV;
+  if (isPlaying) stopPlayback(); 
+}
+
+bpmInput.addEventListener('input', (e) => {
+  const val = parseInt(e.target.value);
+  if (!isNaN(val)) updateTempo(val);
+});
+
+bpmInput.addEventListener('blur', (e) => {
+  e.target.value = TEMPO;
+});
+
+/* -------------------------------------------------
+   DATA MODEL
+   ------------------------------------------------- */
+const notes = Array.from({ length: STEPS }, () =>
+  new Uint8Array(PITCHES.length)
+);
+
+const instrumentSettings = [
+  { waveType: 'square', hold: false, customWavePoints: null, customCoeffs: null },
+  { waveType: 'sawtooth', hold: false, customWavePoints: null, customCoeffs: null },
+  { waveType: 'sine', hold: false, customWavePoints: null, customCoeffs: null },
+  { waveType: 'sine', hold: false, customWavePoints: null, customCoeffs: null }
+];
+
+let currentInstrument = 0; 
+
+/* -------------------------------------------------
+   CANVAS & DOM SETUP
+   ------------------------------------------------- */
+const canvas = document.getElementById('rollCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = STEPS * CELL_W;
+canvas.height = PITCHES.length * CELL_H;
+
+const labelsCol = document.getElementById('labelsCol');
+const container = document.getElementById('canvasScroller'); 
+
+PITCHES.forEach(p => {
+  const div = document.createElement('div');
+  div.className = 'label-row';
+  div.innerText = p;
+  labelsCol.appendChild(div);
+});
+
+container.addEventListener('scroll', () => {
+  labelsCol.scrollTop = container.scrollTop;
+});
+
+/* -------------------------------------------------
+   INSTRUMENT MODAL & CUSTOM WAVE LOGIC
+   ------------------------------------------------- */
+const modal = document.getElementById('instrumentModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalStyle = document.getElementById('modalStyle');
+const modalHold = document.getElementById('modalHold');
+const saveInstrumentBtn = document.getElementById('saveInstrumentBtn');
+const closeBtn = document.getElementsByClassName('close')[0];
+
+const customWaveGroup = document.getElementById('customWaveGroup');
+const waveCanvas = document.getElementById('waveCanvas');
+const waveCtx = waveCanvas.getContext('2d');
+const resetWaveBtn = document.getElementById('resetWaveBtn');
+
+document.getElementById('inst0Btn').addEventListener('click', () => openInstrumentModal(0));
+document.getElementById('inst1Btn').addEventListener('click', () => openInstrumentModal(1));
+document.getElementById('inst2Btn').addEventListener('click', () => openInstrumentModal(2));
+document.getElementById('inst3Btn').addEventListener('click', () => openInstrumentModal(3));
+
+function openInstrumentModal(instIdx) {
+  currentInstrument = instIdx;
+  const colors = ['Red', 'Blue', 'Green', 'Yellow'];
+  modalTitle.textContent = `${colors[instIdx]} Instrument Settings`;
+  
+  modalStyle.value = instrumentSettings[instIdx].waveType;
+  modalHold.checked = instrumentSettings[instIdx].hold;
+  
+  if (modalStyle.value === 'custom') {
+    customWaveGroup.style.display = 'block';
+  } else {
+    customWaveGroup.style.display = 'none';
+  }
+  
+  if (!instrumentSettings[instIdx].customWavePoints) {
+    initDefaultCustomWave(instIdx);
+  }
+  
+  drawWaveCanvas(instIdx);
+  modal.style.display = 'block';
+}
+
+modalStyle.addEventListener('change', () => {
+  const selectedValue = modalStyle.value;
+  const currentStyle = getStyleByValue(selectedValue);
+
+  if (!currentStyle) return;
+
+  const holdGroup = document.getElementById('holdControlGroup');
+  if (currentStyle.options.hold) {
+    holdGroup.style.display = 'block';
+    document.getElementById('modalHold').disabled = false;
+  } else {
+    holdGroup.style.display = 'none'; 
+    document.getElementById('modalHold').checked = false; 
+  }
+
+  if (currentStyle.options.customWave) {
+    customWaveGroup.style.display = 'block';
+    if (!instrumentSettings[currentInstrument].customWavePoints) {
+      initDefaultCustomWave(currentInstrument);
+    }
+    drawWaveCanvas(currentInstrument);
+  } else {
+    customWaveGroup.style.display = 'none';
+  }
+});
+
+closeBtn.onclick = function() { modal.style.display = 'none'; }
+
+function initDefaultCustomWave(instIdx) {
+  const pts = new Float32Array(256);
+  for (let i = 0; i < 256; i++) {
+    pts[i] = Math.sin((i / 256) * Math.PI * 2);
+  }
+  instrumentSettings[instIdx].customWavePoints = pts;
+  calculateCustomCoeffs(instIdx);
+}
+
+function calculateCustomCoeffs(instIdx) {
+  const points = instrumentSettings[instIdx].customWavePoints;
+  if (!points) return;
+
+  const N = points.length;
+  const harmonics = 32; 
+  const real = new Float32Array(harmonics);
+  const imag = new Float32Array(harmonics);
+
+  for (let k = 1; k < harmonics; k++) {
+    let r = 0, i = 0;
+    for (let n = 0; n < N; n++) {
+      const angle = (2 * Math.PI * k * n) / N;
+      r += points[n] * Math.cos(angle);
+      i += points[n] * Math.sin(angle);
+    }
+    real[k] = (r * 2) / N;
+    imag[k] = (i * 2) / N;
+  }
+
+  instrumentSettings[instIdx].customCoeffs = { real, imag };
+}
+
+function drawWaveCanvas(instIdx) {
+  const pts = instrumentSettings[instIdx].customWavePoints;
+  if (!pts) return;
+
+  waveCtx.fillStyle = '#000';
+  waveCtx.fillRect(0, 0, waveCanvas.width, waveCanvas.height);
+
+  waveCtx.beginPath();
+  waveCtx.strokeStyle = '#d32f2f'; 
+  waveCtx.lineWidth = 2;
+
+  const h = waveCanvas.height;
+  const w = waveCanvas.width;
+  const mid = h / 2;
+  const scale = mid * 0.9;
+
+  for (let i = 0; i < w; i++) {
+    const idx = Math.floor((i / w) * pts.length);
+    const y = mid - (pts[idx] * scale);
+    
+    if (i === 0) waveCtx.moveTo(i, y);
+    else waveCtx.lineTo(i, y);
+  }
+  waveCtx.stroke();
+}
+
+let isDrawingWave = false;
+
+function handleWaveDraw(e) {
+  const rect = waveCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  const pts = instrumentSettings[currentInstrument].customWavePoints;
+  if (!pts) return;
+  
+  const val = 1 - (2 * y / waveCanvas.height);
+  
+  const startIdx = Math.floor((x / waveCanvas.width) * pts.length);
+  const endIdx = Math.min(pts.length, startIdx + 3); 
+  for (let i = startIdx; i < endIdx; i++) {
+    pts[i] = val;
+  }
+  
+  drawWaveCanvas(currentInstrument);
+}
+
+waveCanvas.addEventListener('mousedown', (e) => {
+  isDrawingWave = true;
+  handleWaveDraw(e);
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (isDrawingWave) handleWaveDraw(e);
+});
+
+window.addEventListener('mouseup', () => {
+  isDrawingWave = false;
+});
+
+waveCanvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  isDrawingWave = true;
+  handleWaveDraw(e.touches[0]);
+}, {passive: false});
+
+waveCanvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if(isDrawingWave) handleWaveDraw(e.touches[0]);
+}, {passive: false});
+
+waveCanvas.addEventListener('touchend', () => {
+  isDrawingWave = false;
+});
+
+resetWaveBtn.addEventListener('click', () => {
+  initDefaultCustomWave(currentInstrument);
+  drawWaveCanvas(currentInstrument);
+});
+
+saveInstrumentBtn.onclick = function() {
+  instrumentSettings[currentInstrument].waveType = modalStyle.value;
+  instrumentSettings[currentInstrument].hold = modalHold.checked;
+  
+  if (modalStyle.value === 'custom') {
+    calculateCustomCoeffs(currentInstrument);
+  }
+  
+  modal.style.display = 'none';
+}
+
+window.onclick = function(event) {
+  if (event.target == modal) modal.style.display = 'none';
+  if (event.target == melodyModal) melodyModal.style.display = 'none';
+  if (event.target == genModal) genModal.style.display = 'none';
+}
+
+/* -------------------------------------------------
+   MELODY PANEL
+   ------------------------------------------------- */
+const melodyModal = document.getElementById('melodyModal');
+const melodyTableBody = document.getElementById('melodyTableBody');
+const closeMelody = document.getElementById('closeMelody');
+const playBtn = document.getElementById('playBtn');
+
+let pressTimer;
+const LONG_PRESS_DURATION = 500; 
+
+function openMelodyPanel() {
+  updateMelodyTable();
+  melodyModal.style.display = 'block';
+}
+
+playBtn.addEventListener('mousedown', (e) => {
+  pressTimer = setTimeout(openMelodyPanel, LONG_PRESS_DURATION);
+});
+
+playBtn.addEventListener('mouseup', (e) => {
+  clearTimeout(pressTimer);
+  if (!melodyModal.style.display || melodyModal.style.display === 'none') {
+    if (isPlaying) stopPlayback(); else startPlayback();
+  }
+});
+
+playBtn.addEventListener('mouseleave', () => clearTimeout(pressTimer));
+playBtn.addEventListener('touchstart', (e) => {
+  pressTimer = setTimeout(openMelodyPanel, LONG_PRESS_DURATION);
+}, {passive: true});
+playBtn.addEventListener('touchend', (e) => {
+  clearTimeout(pressTimer);
+  if (!melodyModal.style.display || melodyModal.style.display === 'none') {
+    if (isPlaying) stopPlayback(); else startPlayback();
+  }
+});
+
+closeMelody.onclick = () => melodyModal.style.display = 'none';
+
+function generateMelodyList() {
+  const list = [];
+  for (let step = 0; step < STEPS; step++) {
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const mask = notes[step][pitch];
+      if (!mask) continue;
+      for (let i = 0; i < 4; i++) {
+        const bit = 1 << i;
+        if (mask & bit) {
+          if (step > 0 && (notes[step-1][pitch] & bit) && instrumentSettings[i].hold) continue;
+          let durationSteps = 1;
+          if (instrumentSettings[i].hold) {
+            for (let k = step + 1; k < STEPS; k++) {
+              if (notes[k][pitch] & bit) durationSteps++; else break;
+            }
+          }
+          list.push({
+            note: PITCHES[pitch],
+            freq: midiToFreq(pitchToMidi(pitch)),
+            time: Math.round(step * stepSec * 1000),
+            duration: Math.round(durationSteps * stepSec * 1000),
+            instrument: i 
+          });
+        }
+      }
+    }
+  }
+  list.sort((a, b) => a.time - b.time);
+  return list;
+}
+
+function updateMelodyTable() {
+  const list = generateMelodyList();
+  melodyTableBody.innerHTML = '';
+  if (list.length === 0) {
+    melodyTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center">No notes recorded</td></tr>';
+    return;
+  }
+  list.forEach(n => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${n.note}</td><td>${n.freq.toFixed(2)}</td><td>${n.time}</td><td>${n.duration}</td>`;
+    melodyTableBody.appendChild(tr);
+  });
+}
+
+/* -------------------------------------------------
+   JSON IMPORT / EXPORT
+   ------------------------------------------------- */
+document.getElementById('exportJsonBtn').addEventListener('click', () => {
+  const list = generateMelodyList();
+  const data = {
+    name: "Hexano Melody",
+    date: new Date().toISOString(),
+    notes: list.map(n => ({
+      note: n.note,
+      freq: n.freq,
+      time: n.time,
+      duration: n.duration
+    }))
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rollidy_melody_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+const jsonFileInput = document.getElementById('jsonFileInput');
+document.getElementById('importJsonBtn').addEventListener('click', () => jsonFileInput.click());
+
+jsonFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.notes && Array.isArray(data.notes)) {
+        for (let i = 0; i < STEPS; i++) notes[i].fill(0);
+        data.notes.forEach(n => {
+          const pitchIdx = PITCHES.indexOf(n.note);
+          const step = Math.round(n.time / 1000 / stepSec);
+          const durSteps = Math.round(n.duration / 1000 / stepSec);
+          if (pitchIdx !== -1 && step >= 0 && step < STEPS) {
+            const instIdx = 0; 
+            const bit = 1 << instIdx;
+            for (let s = step; s < step + durSteps && s < STEPS; s++) {
+              notes[s][pitchIdx] |= bit;
+            }
+          }
+        });
+        redrawAll();
+        updateMelodyTable();
+      } else { alert("Invalid JSON format."); }
+    } catch (err) { alert("Error parsing JSON: " + err); }
+  };
+  reader.readAsText(file);
+  e.target.value = ''; 
+});
+
+/* -------------------------------------------------
+   AUDIO IMPORT
+   ------------------------------------------------- */
+const audioFileInput = document.getElementById('audioFileInput');
+document.getElementById('importAudioBtn').addEventListener('click', () => audioFileInput.click());
+
+audioFileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    convertAudioToNotes(audioBuffer);
+  } catch (err) {
+    console.error(err);
+    alert("Error processing audio file.");
+  }
+  e.target.value = ''; 
+});
+
+function convertAudioToNotes(buffer) {
+  const data = buffer.getChannelData(0); 
+  const sampleRate = buffer.sampleRate;
+  pushUndo();
+  for (let i = 0; i < STEPS; i++) notes[i].fill(0);
+  const samplesPerStep = Math.floor(sampleRate * stepSec);
+  for (let s = 0; s < STEPS; s++) {
+    const startSample = s * samplesPerStep;
+    const endSample = startSample + samplesPerStep;
+    if (endSample > data.length) break;
+    const chunk = data.slice(startSample, endSample);
+    const freq = autoCorrelate(chunk, sampleRate);
+    if (freq !== -1) {
+      const midi = Math.round(12 * Math.log2(freq / 440) + 69);
+      const pitchIdx = midi - 24; 
+      if (pitchIdx >= 0 && pitchIdx < PITCHES.length) {
+        notes[s][pitchIdx] |= (1 << 0); 
+      }
+    }
+  }
+  redrawAll();
+}
+
+function autoCorrelate(buffer, sampleRate) {
+  let SIZE = buffer.length;
+  let rms = 0;
+  for (let i = 0; i < SIZE; i++) rms += buffer[i] * buffer[i];
+  rms = Math.sqrt(rms / SIZE);
+  if (rms < 0.01) return -1; 
+  let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+  for (let i = 0; i < SIZE / 2; i++) { if (Math.abs(buffer[i]) < thres) { r1 = i; break; } }
+  for (let i = 1; i < SIZE / 2; i++) { if (Math.abs(buffer[SIZE - i]) < thres) { r2 = SIZE - i; break; } }
+  buffer = buffer.slice(r1, r2);
+  SIZE = buffer.length;
+  const MIN_LAG = Math.floor(sampleRate / 4000); 
+  const MAX_LAG = Math.min(SIZE - 1, Math.floor(sampleRate / 30));
+  let maxval = -1, maxpos = -1;
+  for (let i = MIN_LAG; i <= MAX_LAG; i++) {
+    let sum = 0;
+    for (let j = 0; j < SIZE - i; j++) sum += buffer[j] * buffer[j + i];
+    if (sum > maxval) { maxval = sum; maxpos = i; }
+  }
+  if (maxpos === -1) return -1;
+  let T0 = maxpos;
+  return sampleRate / T0;
+}
+
+/* -------------------------------------------------
+   DARK/LIGHT MODE TOGGLE
+   ------------------------------------------------- */
+const lightModeToggle = document.getElementById('lightMode');
+lightModeToggle.addEventListener('change', () => {
+  if (lightModeToggle.checked) document.body.classList.add('light-mode');
+  else document.body.classList.remove('light-mode');
+  redrawAll();
+});
+
+/* -------------------------------------------------
+   SELECTION STATE
+   ------------------------------------------------- */
+let selectedCorners = [];
+let isSelecting = false;
+let isDraggingSelection = false;
+let selectionRect = { x1: 0, y1: 0, x2: 0, y2: 0 };
+let dragStart = { x: 0, y: 0 };
+let dragOffset = { x: 0, y: 0 };
+
+/* -------------------------------------------------
+   COPY / PASTE LOGIC
+   ------------------------------------------------- */
+function handleCopy() {
+  if (selectedCorners.length === 0) return;
+  
+  // Find top-left corner of selection to normalize coordinates
+  let minStep = Infinity, minPitch = Infinity;
+  selectedCorners.forEach(c => {
+    if (c.step < minStep) minStep = c.step;
+    if (c.pitch < minPitch) minPitch = c.pitch;
+  });
+  
+  clipboard = selectedCorners.map(c => ({
+    dStep: c.step - minStep,
+    dPitch: c.pitch - minPitch,
+    instIdx: c.instIdx,
+    isPause: c.isPause
+  }));
+  
+  // Optional: Visual feedback
+  console.log(`Copied ${clipboard.length} notes.`);
+}
+
+function handlePaste() {
+  if (clipboard.length === 0) return;
+  
+  pushUndo(); // Save state for undo
+  
+  // Determine anchor point (mouse position or 0,0 if mouse is off-grid)
+  const anchorStep = (hoverStep >= 0) ? hoverStep : 0;
+  const anchorPitch = (hoverPitch >= 0) ? hoverPitch : 0;
+  
+  const newSelection = [];
+  
+  clipboard.forEach(c => {
+    const targetStep = anchorStep + c.dStep;
+    const targetPitch = anchorPitch + c.dPitch;
+    
+    // Check boundaries
+    if (targetStep >= 0 && targetStep < STEPS && targetPitch >= 0 && targetPitch < PITCHES.length) {
+      const bit = c.isPause ? (1 << (c.instIdx + 4)) : (1 << c.instIdx);
+      
+      // Place note (using OR to preserve existing notes, typical for piano rolls)
+      notes[targetStep][targetPitch] |= bit;
+      
+      // Add to new selection
+      newSelection.push({ 
+        step: targetStep, 
+        pitch: targetPitch, 
+        instIdx: c.instIdx, 
+        isPause: c.isPause 
+      });
+    }
+  });
+  
+  // Select the newly pasted notes
+  selectedCorners = newSelection;
+  redrawAll();
+  
+  // NEW: Refresh audio if currently playing
+  if (isPlaying) refreshLiveAudio();
+}
+
+/* -------------------------------------------------
+   DRAWING
+   ------------------------------------------------- */
+function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+function drawGrid() {
+  const gridColor = getComputedStyle(document.body).getPropertyValue('--grid-color').trim();
+  const gridTextColor = getComputedStyle(document.body).getPropertyValue('--grid-text').trim();
+  const pairRowBg = getComputedStyle(document.body).getPropertyValue('--pair-row-bg').trim();
+  
+  for (let y = 0; y < PITCHES.length; y++) {
+    if (y % 2 === 1) {
+      ctx.fillStyle = pairRowBg;
+      ctx.fillRect(0, y * CELL_H, canvas.width, CELL_H);
+    }
+  }
+  
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= STEPS; x++) {
+    ctx.beginPath();
+    ctx.moveTo(x * CELL_W, 0);
+    ctx.lineTo(x * CELL_W, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= PITCHES.length; y++) {
+    ctx.beginPath();
+    ctx.moveTo(0, y * CELL_H);
+    ctx.lineTo(canvas.width, y * CELL_H);
+    ctx.stroke();
+  }
+  
+  ctx.fillStyle = gridTextColor;
+  ctx.font = '12px Arial';
+  ctx.textAlign = 'center';
+  for (let b = 0; b <= BEATS; b++) {
+    ctx.fillText(b + 1, b * CELL_W * SUBDIV + (CELL_W * SUBDIV) / 2, 14);
+  }
+}
+
+function redrawAll() {
+  clearCanvas();
+  drawGrid();
+  drawNotes();
+  drawHighlight();
+  
+  if (isSelecting) drawSelectionBox();
+  if (selectedCorners.length > 0 && !isDraggingSelection) drawSelectionBorders();
+  if (isDraggingSelection) drawDraggedNotes();
+}
+
+function drawSelectionBox() {
+  const x = Math.min(selectionRect.x1, selectionRect.x2);
+  const y = Math.min(selectionRect.y1, selectionRect.y2);
+  const w = Math.abs(selectionRect.x2 - selectionRect.x1);
+  const h = Math.abs(selectionRect.y2 - selectionRect.y1);
+  
+  ctx.strokeStyle = lightModeToggle.checked ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5, 5]);
+  ctx.strokeRect(x, y, w, h);
+  ctx.setLineDash([]);
+}
+
+function drawSelectionBorders() {
+  const borderColor = lightModeToggle.checked ? '#000000' : '#ffffff';
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+
+  selectedCorners.forEach(c => {
+    const x = c.step * CELL_W;
+    const y = c.pitch * CELL_H;
+    const w2 = CELL_W / 2;
+    const h2 = CELL_H / 2;
+    let cx = x;
+    let cy = y;
+    if (c.instIdx === 1 || c.instIdx === 3) cx += w2;
+    if (c.instIdx === 2 || c.instIdx === 3) cy += h2;
+
+    ctx.strokeRect(cx, cy, w2, h2);
+  });
+}
+
+function drawDraggedNotes() {
+  const stepDeltaPx = dragOffset.x;
+  const pitchDeltaPx = dragOffset.y;
+  
+  ctx.globalAlpha = 0.6;
+
+  selectedCorners.forEach(c => {
+    const baseX = c.step * CELL_W;
+    const baseY = c.pitch * CELL_H;
+    const w2 = CELL_W / 2;
+    const h2 = CELL_H / 2;
+    let cx = baseX;
+    let cy = baseY;
+    if (c.instIdx === 1 || c.instIdx === 3) cx += w2;
+    if (c.instIdx === 2 || c.instIdx === 3) cy += h2;
+
+    const finalX = cx + stepDeltaPx;
+    const finalY = cy + pitchDeltaPx;
+
+    ctx.fillStyle = c.isPause ? getPauseColor() : getWaveColor(c.instIdx);
+    ctx.fillRect(finalX + 1, finalY + 1, w2 - 2, h2 - 2);
+    
+    ctx.strokeStyle = lightModeToggle.checked ? '#000' : '#fff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(finalX, finalY, w2, h2);
+  });
+
+  ctx.globalAlpha = 1.0;
+}
+
+let hoverStep = -1;
+let hoverPitch = -1;
+
+function drawHighlight() {
+  if (isSelecting || isDraggingSelection) return;
+  if (hoverStep < 0 || hoverPitch < 0) return;
+  const highlightColor = getComputedStyle(document.body).getPropertyValue('--highlight-color').trim();
+  const highlightIntersection = getComputedStyle(document.body).getPropertyValue('--highlight-intersection').trim();
+  ctx.fillStyle = highlightColor;
+  ctx.fillRect(hoverStep * CELL_W, 0, CELL_W, canvas.height);
+  ctx.fillStyle = highlightColor;
+  ctx.fillRect(0, hoverPitch * CELL_H, canvas.width, CELL_H);
+  ctx.fillStyle = highlightIntersection;
+  ctx.fillRect(hoverStep * CELL_W, hoverPitch * CELL_H, CELL_W, CELL_H);
+}
+
+function drawNotes() {
+  for (let step = 0; step < STEPS; step++) {
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const mask = notes[step][pitch];
+      if (!mask) continue;
+      
+      const x = step * CELL_W;
+      const y = pitch * CELL_H;
+      
+      for (let i = 0; i < 4; i++) {
+        if (mask & (1 << i)) {
+           if (isDraggingSelection && selectedCorners.some(c => c.step ===step && c.pitch===pitch && c.instIdx===i && !c.isPause)) continue;
+           drawCorner(x, y, i);
+        }
+      }
+      
+      for (let i = 0; i < 4; i++) {
+        if (mask & (1 << (i + 4))) {
+           if (isDraggingSelection && selectedCorners.some(c => c.step===step && c.pitch===pitch && c.instIdx===i && c.isPause)) continue;
+           drawPauseCorner(x, y, i);
+        }
+      }
+    }
+  }
+}
+
+function drawPauseCorner(cellX, cellY, pauseIdx) {
+  const w = CELL_W / 2;
+  const h = CELL_H / 2;
+  let cx = cellX;
+  let cy = cellY;
+  if (pauseIdx === 1) cx = cellX + w;
+  if (pauseIdx === 2) cy = cellY + h;
+  if (pauseIdx === 3) { cx = cellX + w; cy = cellY + h; }
+  ctx.fillStyle = getPauseColor();
+  ctx.fillRect(cx + 1, cy + 1, w - 2, h - 2);
+  ctx.strokeStyle = lightModeToggle.checked ? "#666" : "#aaa";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx + 4, cy + 4);
+  ctx.lineTo(cx + w - 4, cy + h - 4);
+  ctx.moveTo(cx + w - 4, cy + 4);
+  ctx.lineTo(cx + 4, cy + h - 4);
+  ctx.stroke();
+}
+
+function getPauseColor() {
+  return lightModeToggle.checked ? '#cccccc' : '#444444';
+}
+
+function drawCorner(cellX, cellY, instIdx) {
+  const w = CELL_W / 2;
+  const h = CELL_H / 2;
+  let cx = cellX;
+  let cy = cellY;
+  if (instIdx === 1) cx = cellX + w;
+  if (instIdx === 2) cy = cellY + h;
+  if (instIdx === 3) { cx = cellX + w; cy = cellY + h; }
+  
+  ctx.fillStyle = getWaveColor(instIdx);
+  ctx.fillRect(cx + 1, cy + 1, w - 2, h - 2);
+
+  const radius = Math.min(w, h) / 5;
+  const fillColor = '#ffffff'; 
+  const strokeColor = '#333333';
+  const centerY = cy + h / 2;
+
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1;
+
+  switch (instIdx) {
+    case 0: 
+      ctx.beginPath();
+      ctx.arc(cx + w / 2, centerY, radius, Math.PI / 2, Math.PI * 1.5);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    case 1: 
+      ctx.beginPath();
+      ctx.arc(cx + w / 2, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    case 2: 
+      ctx.beginPath();
+      ctx.arc(cx + w / 3, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx + 2 * w / 3, centerY, radius, Math.PI / 2, Math.PI * 1.5);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    case 3: 
+      ctx.beginPath();
+      ctx.arc(cx + w / 3, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx + 2 * w / 3, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      break;
+  }
+}
+
+function getWaveColor(i) {
+  const colors = ['#d32f2f', '#1976d2', '#388e3c', '#fbc02d'];
+  return colors[i % colors.length];
+}
+
+/* -------------------------------------------------
+   INTERACTION LOGIC
+   ------------------------------------------------- */
+function toggleNoteAt(x, y, isCtrlClick = false) {
+  const step = Math.floor(x / CELL_W);
+  const pitch = Math.floor(y / CELL_H);
+  if (step < 0 || step >= STEPS || pitch < 0 || pitch >= PITCHES.length) return;
+  pushUndo(); 
+  const relX = x - step * CELL_W;
+  const relY = y - pitch * CELL_H;
+  const left = relX < CELL_W / 2;
+  const top = relY < CELL_H / 2;
+  const instIdx = (top ? 0 : 2) + (left ? 0 : 1);
+  if (isCtrlClick) {
+    const pauseBit = 1 << (instIdx + 4); 
+    const instBit = 1 << instIdx;        
+    if (notes[step][pitch] & pauseBit) notes[step][pitch] &= ~pauseBit; 
+    else {
+      notes[step][pitch] &= ~instBit;  
+      notes[step][pitch] |= pauseBit;  
+    }
+  } else {
+    const instBit = 1 << instIdx;
+    const pauseBit = 1 << (instIdx + 4);
+    if (notes[step][pitch] & instBit) notes[step][pitch] &= ~instBit; 
+    else {
+      notes[step][pitch] &= ~pauseBit; 
+      notes[step][pitch] |= instBit;   
+    }
+  }
+  redrawAll();
+  
+  // NEW: Refresh audio if currently playing
+  if (isPlaying) refreshLiveAudio();
+}
+
+function deleteSelectedNotes() {
+  if (selectedCorners.length === 0) return;
+  
+  pushUndo(); // Save state for undo
+  
+  selectedCorners.forEach(c => {
+    const bit = c.isPause ? (1 << (c.instIdx + 4)) : (1 << c.instIdx);
+    notes[c.step][c.pitch] &= ~bit;
+  });
+  
+  selectedCorners = []; // Clear selection
+  redrawAll();
+  
+  // NEW: Refresh audio if currently playing
+  if (isPlaying) refreshLiveAudio();
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  redoStack.push(cloneNotes());
+  const previous = undoStack.pop();
+  for (let i = 0; i < STEPS; i++) notes[i] = new Uint8Array(previous[i]);
+  redrawAll();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(cloneNotes());
+  const next = redoStack.pop();
+  for (let i = 0; i < STEPS; i++) notes[i] = new Uint8Array(next[i]);
+  redrawAll();
+}
+
+/* -------------------------------------------------
+   EVENT LISTENERS
+   ------------------------------------------------- */
+window.addEventListener('keydown', e => {
+  const active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')) return;
+  
+  // Handle Delete / Backspace
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault(); // Prevent browser back navigation on Backspace
+    deleteSelectedNotes();
+    return;
+  }
+
+  if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); return; }
+  if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); redo(); return; }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (isPlaying) stopPlayback(); else startPlayback();
+    return;
+  }
+  if (e.ctrlKey) {
+    const stepPx = 40;
+    switch (e.key) {
+      case 'ArrowUp': container.scrollTop -= stepPx; e.preventDefault(); break;
+      case 'ArrowDown': container.scrollTop += stepPx; e.preventDefault(); break;
+      case 'ArrowLeft': container.scrollLeft -= stepPx; e.preventDefault(); break;
+      case 'ArrowRight': container.scrollLeft += stepPx; e.preventDefault(); break;
+    }
+    return;
+  }
+});
+
+window.addEventListener('keydown', e => { if (e.key === 'Control') canvas.style.cursor = 'crosshair'; });
+window.addEventListener('keyup', e => { if (e.key === 'Control') canvas.style.cursor = 'default'; });
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+let isPanning = false;
+let panStartX, panStartY;
+let panStartScrollLeft, panStartScrollTop;
+let isDrawing = false;
+let isDragging = false;
+let startX = 0, startY = 0;
+const DRAG_THRESHOLD = 3;
+let isCtrlDrawing = false; 
+let lastMouseX = 0, lastMouseY = 0;
+
+function getCornerAt(mx, my) {
+  const step = Math.floor(mx / CELL_W);
+  const pitch = Math.floor(my / CELL_H);
+  if (step < 0 || step >= STEPS || pitch < 0 || pitch >= PITCHES.length) return null;
+  
+  const relX = mx - step * CELL_W;
+  const relY = my - pitch * CELL_H;
+  const left = relX < CELL_W / 2;
+  const top = relY < CELL_H / 2;
+  const instIdx = (top ? 0 : 2) + (left ? 0 : 1);
+  
+  const mask = notes[step][pitch];
+  const isPause = (mask & (1 << (instIdx + 4))) !== 0;
+  const isInst = (mask & (1 << instIdx)) !== 0;
+  
+  if (isPause || isInst) {
+    return { step, pitch, instIdx, isPause };
+  }
+  return null;
+}
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  
+  // FIX: Store absolute client coordinates so 'mouseup' can calculate correctly
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+
+  if (e.button === 0 && e.ctrlKey) {
+    const clickedCorner = getCornerAt(mx, my);
+    
+    if (clickedCorner && selectedCorners.some(c => 
+        c.step === clickedCorner.step && 
+        c.pitch === clickedCorner.pitch && 
+        c.instIdx === clickedCorner.instIdx && 
+        c.isPause === clickedCorner.isPause)) {
+      
+      isDraggingSelection = true;
+      dragStart.x = mx;
+      dragStart.y = my;
+      pushUndo(); 
+    } else {
+      isSelecting = true;
+      selectionRect.x1 = mx;
+      selectionRect.y1 = my;
+      selectionRect.x2 = mx;
+      selectionRect.y2 = my;
+      selectedCorners = [];
+    }
+    return;
+  }
+
+  if (e.button === 2) { 
+    if (!e.ctrlKey) return;
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    panStartScrollLeft = container.scrollLeft;
+    panStartScrollTop = container.scrollTop;
+    canvas.style.cursor = 'grabbing';
+  } else if (e.button === 0) { 
+    if (selectedCorners.length > 0) {
+      selectedCorners = [];
+      redrawAll();
+    }
+    
+    isDrawing = true;
+    isDragging = false;
+    isCtrlDrawing = e.ctrlKey; 
+    startX = mx;
+    startY = my;
+  }
+});
+
+window.addEventListener('mousemove', e => {
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+  
+  if (isPanning) {
+    const dx = e.clientX - panStartX;
+    const dy = e.clientY - panStartY;
+    container.scrollLeft = panStartScrollLeft - dx;
+    container.scrollTop = panStartScrollTop - dy;
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  if (isSelecting) {
+    selectionRect.x2 = mx;
+    selectionRect.y2 = my;
+    redrawAll();
+    return;
+  }
+
+  if (isDraggingSelection) {
+    dragOffset.x = mx - dragStart.x;
+    dragOffset.y = my - dragStart.y;
+    redrawAll();
+    return;
+  }
+
+  const s = Math.floor(mx / CELL_W);
+  const p = Math.floor(my / CELL_H);
+  if (s !== hoverStep || p !== hoverPitch) {
+    hoverStep = s;
+    hoverPitch = p;
+    if (!isDrawing) redrawAll(); 
+  }
+  if (!isDrawing) return;
+  
+  const distX = Math.abs(mx - startX);
+  const distY = Math.abs(my - startY);
+  if (!isDragging && (distX > DRAG_THRESHOLD || distY > DRAG_THRESHOLD)) isDragging = true;
+  if (isDragging) {
+    toggleNoteAt(mx, my, isCtrlDrawing);
+    startX = mx;
+  }
+});
+
+window.addEventListener('mouseup', e => {
+  if (isSelecting) {
+    const x1 = Math.min(selectionRect.x1, selectionRect.x2);
+    const x2 = Math.max(selectionRect.x1, selectionRect.x2);
+    const y1 = Math.min(selectionRect.y1, selectionRect.y2);
+    const y2 = Math.max(selectionRect.y1, selectionRect.y2);
+    
+    selectedCorners = [];
+
+    const startStep = Math.floor(x1 / CELL_W);
+    const endStep = Math.floor(x2 / CELL_W);
+    const startPitch = Math.floor(y1 / CELL_H);
+    const endPitch = Math.floor(y2 / CELL_H);
+
+    for (let s = startStep; s <= endStep; s++) {
+      for (let p = startPitch; p <= endPitch; p++) {
+         if (s < 0 || s >= STEPS || p < 0 || p >= PITCHES.length) continue;
+         
+         const mask = notes[s][p];
+         if (mask === 0) continue;
+         
+         const cellX = s * CELL_W;
+         const cellY = p * CELL_H;
+         const w2 = CELL_W / 2;
+         const h2 = CELL_H / 2;
+         
+         const corners = [
+            { idx: 0, x: cellX, y: cellY },
+            { idx: 1, x: cellX + w2, y: cellY },
+            { idx: 2, x: cellX, y: cellY + h2 },
+            { idx: 3, x: cellX + w2, y: cellY + h2 }
+         ];
+
+         corners.forEach(c => {
+            const cx = c.x + w2/2;
+            const cy = c.y + h2/2;
+            
+            if (cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2) {
+                const isInst = (mask & (1 << c.idx)) !== 0;
+                const isPause = (mask & (1 << (c.idx + 4))) !== 0;
+                
+                if (isInst) selectedCorners.push({ step: s, pitch: p, instIdx: c.idx, isPause: false });
+                else if (isPause) selectedCorners.push({ step: s, pitch: p, instIdx: c.idx, isPause: true });
+            }
+         });
+      }
+    }
+    
+    isSelecting = false;
+    redrawAll();
+    return;
+  }
+
+  if (isDraggingSelection) {
+    const stepDelta = Math.round(dragOffset.x / CELL_W);
+    const pitchDelta = Math.round(dragOffset.y / CELL_H);
+
+    if (stepDelta !== 0 || pitchDelta !== 0) {
+      selectedCorners.forEach(c => {
+        const bit = c.isPause ? (1 << (c.instIdx + 4)) : (1 << c.instIdx);
+        notes[c.step][c.pitch] &= ~bit;
+      });
+
+      selectedCorners.forEach(c => {
+        const newStep = c.step + stepDelta;
+        const newPitch = c.pitch + pitchDelta;
+        if (newStep >= 0 && newStep < STEPS && newPitch >= 0 && newPitch < PITCHES.length) {
+          const bit = c.isPause ? (1 << (c.instIdx + 4)) : (1 << c.instIdx);
+          notes[newStep][newPitch] |= bit;
+          
+          c.step = newStep;
+          c.pitch = newPitch;
+        }
+      });
+    }
+    
+    isDraggingSelection = false;
+    dragOffset.x = 0; dragOffset.y = 0;
+    redrawAll();
+    return;
+  }
+
+  if (isPanning) {
+    isPanning = false;
+    canvas.style.cursor = 'default';
+  }
+  if (isDrawing) {
+    if (!isDragging) {
+      const rect = canvas.getBoundingClientRect();
+      const mx = lastMouseX - rect.left;
+      const my = lastMouseY - rect.top;
+      toggleNoteAt(mx, my, isCtrlDrawing);
+    }
+    isDrawing = false;
+    isDragging = false;
+    isCtrlDrawing = false;
+    startX = startY = 0;
+  }
+});
+
+let lastTouchCenter = null;
+
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    toggleNoteAt(touch.clientX - rect.left, touch.clientY - rect.top, false); 
+  } else if (e.touches.length === 2) {
+    lastTouchCenter = getTouchCenter(e.touches);
+  }
+  e.preventDefault(); 
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 1) {
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    toggleNoteAt(touch.clientX - rect.left, touch.clientY - rect.top, false);
+  } else if (e.touches.length === 2 && lastTouchCenter) {
+    const newCenter = getTouchCenter(e.touches);
+    const dx = newCenter.x - lastTouchCenter.x;
+    const dy = newCenter.y - lastTouchCenter.y;
+    container.scrollLeft -= dx;
+    container.scrollTop -= dy;
+    lastTouchCenter = newCenter;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  if (e.touches.length < 2) lastTouchCenter = null;
+});
+
+function getTouchCenter(touches) {
+  return {
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2
+  };
+}
+
+/* -------------------------------------------------
+   AUDIO UTILS
+   ------------------------------------------------- */
+let audioCtx = null; 
+let playSource = null; 
+
+function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+function pitchToMidi(idx) { return 24 + idx; }
+
+function scheduleNote(ctx, start, dur, pitchIdx, instIdx) {
+  start = Math.max(0, start);
+  if (dur <= 0) return;
+
+  const freq = midiToFreq(pitchToMidi(pitchIdx));
+  const setting = instrumentSettings[instIdx];
+  
+  // FIX: Check Mute setting
+  if (setting.waveType === 'mute') return;
+
+  const style = getStyle(setting.waveType);
+  if (!style) return;
+
+  const osc = style.createOscillator(ctx, freq, { customCoeffs: setting.customCoeffs });
+  if (!osc) return;
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(0.2, start + 0.01);
+  
+  const sustainStart = start + 0.01;
+  const sustainEnd = start + dur - 0.05;
+  
+  if (sustainEnd > sustainStart) {
+    gain.gain.setValueAtTime(0.2, sustainStart);
+    gain.gain.linearRampToValueAtTime(0.2, sustainEnd);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  } else {
+    gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  }
+  
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.1);
+}
+
+/* -------------------------------------------------
+   OFFLINE AUDIO RENDERING
+   ------------------------------------------------- */
+function findLastStep() {
+  let lastStep = -1;
+  for (let step = STEPS - 1; step >= 0; step--) {
+    if (notes[step].some(val => val > 0)) { lastStep = step; break; }
+  }
+  return lastStep;
+}
+
+async function renderSong() {
+  const lastStep = findLastStep();
+  if (lastStep === -1) return null;
+  const totalSteps = lastStep + 1;
+  const duration = totalSteps * stepSec + 0.1; 
+  const sampleRate = 44100;
+  const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+  
+  for (let step = 0; step < totalSteps; step++) {
+    const stepStart = step * stepSec;
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const currentMask = notes[step][pitch];
+      if (!currentMask) continue;
+      const prevMask = (step > 0) ? notes[step - 1][pitch] : 0;
+      for (let i = 0; i < 4; i++) {
+        const bit = 1 << i;
+        if (currentMask & bit) {
+          if (instrumentSettings[i].hold) {
+            if (prevMask & bit) continue;
+            let length = 1;
+            for (let k = step + 1; k < totalSteps; k++) {
+              if (notes[k][pitch] & bit) length++; else break;
+            }
+            scheduleNote(offlineCtx, stepStart, length * stepSec, pitch, i);
+          } else {
+            scheduleNote(offlineCtx, stepStart, stepSec * 0.9, pitch, i);
+          }
+        }
+      }
+    }
+  }
+  return await offlineCtx.startRendering();
+}
+
+/* -------------------------------------------------
+   DYNAMIC AUDIO REFRESH
+   ------------------------------------------------- */
+let renderId = 0;
+
+async function refreshLiveAudio() {
+  if (!isPlaying || !audioCtx) return;
+  
+  // Increment ID to handle race conditions (ignore stale renders)
+  const myId = ++renderId;
+  
+  const buffer = await renderSong();
+  
+  // If a newer render started, or playback stopped, abort
+  if (myId !== renderId || !isPlaying) return;
+  
+  // If buffer is empty (no notes), stop
+  if (!buffer) {
+      stopPlayback();
+      return;
+  }
+
+  // 1. Capture current time state
+  const elapsed = audioCtx.currentTime - playStartTime;
+
+  // 2. Stop the old source immediately
+  if (playSource) {
+    try {
+      playSource.onended = null; // Prevent stopPlayback trigger
+      playSource.stop();
+      playSource.disconnect();
+    } catch (e) {}
+  }
+
+  // 3. Create and start new source
+  playSource = audioCtx.createBufferSource();
+  playSource.buffer = buffer;
+  playSource.loop = true; // Always loop the audio buffer
+  playSource.connect(audioCtx.destination);
+  
+  // 4. Calculate offset to resume from
+  // We wrap the offset using modulo (%) to handle cases where elapsed > new duration
+  const offset = elapsed % buffer.duration;
+  
+  playSource.start(0, offset);
+
+  // 5. Update timing vars for visuals
+  playStartTime = audioCtx.currentTime - offset;
+  currentBufferDuration = buffer.duration;
+}
+
+/* -------------------------------------------------
+   PLAYBACK
+   ------------------------------------------------- */
+let playAnim = null;
+let playStartTime = 0;
+let currentBufferDuration = 0;
+
+async function startPlayback() {
+  // If already playing, stop the previous instance cleanly
+  if (isPlaying) stopPlayback();
+
+  const requestId = ++playRequestId;
+
+  const buffer = await renderSong();
+  
+  if (requestId !== playRequestId) return; // Aborted
+
+  if (!audioCtx || audioCtx.state === 'closed') audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  
+  if (buffer) {
+    playSource = audioCtx.createBufferSource();
+    playSource.buffer = buffer;
+    playSource.connect(audioCtx.destination);
+    
+    // Always set loop=true for seamless audio.
+    // We will stop it manually if the user unchecks the box at the right time.
+    playSource.loop = true;
+    
+    playSource.start(0);
+    currentBufferDuration = buffer.duration;
+    playStartTime = audioCtx.currentTime;
+  } else {
+    currentBufferDuration = 0;
+    return; 
+  }
+  
+  isPlaying = true;
+  drawPlayHead();
+}
+
+function stopPlayback() {
+  playRequestId++;
+
+  if (playAnim) cancelAnimationFrame(playAnim);
+  playAnim = null;
+  
+  isPlaying = false;
+  
+  if (playSource) {
+    try {
+      playSource.onened = null;
+      playSource.stop();
+      playSource.disconnect();
+    } catch(e) { }
+    playSource = null;
+  }
+  
+  playStartTime = 0;
+  redrawAll();
+}
+
+function drawPlayHead() {
+  if (!isPlaying || !audioCtx) return;
+  
+  const elapsed = audioCtx.currentTime - playStartTime;
+  const isLooping = document.getElementById('loop').checked;
+  
+  // 1. Handle End of Song for Non-Looping mode
+  // If we are NOT looping and time is up, stop.
+  if (!isLooping && elapsed >= currentBufferDuration) {
+    stopPlayback();
+    return;
+  }
+  
+  // 2. Calculate visual position
+  // If looping, wrap around. If not, clamp to duration.
+  let visualTime;
+  if (isLooping) {
+    visualTime = elapsed % currentBufferDuration;
+  } else {
+    visualTime = Math.min(elapsed, currentBufferDuration);
+  }
+  
+  // 3. Draw the playhead
+  const posX = (visualTime / stepSec) * CELL_W;
+  redrawAll();
+  ctx.fillStyle = '#ff5722';
+  ctx.fillRect(posX, 0, 2, canvas.height);
+  
+  playAnim = requestAnimationFrame(drawPlayHead);
+}
+
+/* -------------------------------------------------
+   EXPORT & CLEAR
+   ------------------------------------------------- */
+async function exportWav() {
+  stopPlayback();
+  const buffer = await renderSong();
+  if (!buffer) { alert("No notes to export!"); return; }
+  const wavBlob = bufferToWave(buffer);
+  const url = URL.createObjectURL(wavBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rollidy_${new Date().toISOString().slice(0,19)}.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function bufferToWave(abuffer) {
+  const numOfChan = abuffer.numberOfChannels;
+  const length = abuffer.length * numOfChan * 2 + 44;
+  const buffer = new ArrayBuffer(length);
+  const view = new DataView(buffer);
+  const channels = [];
+  let sample; let pos = 0; let offset = 0;
+  const setUint16 = (data) => { view.setUint16(pos, data, true); pos += 2; };
+  const setUint32 = (data) => { view.setUint32(pos, data, true); pos += 4; };
+  setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
+  setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
+  setUint32(abuffer.sampleRate); setUint32(abuffer.sampleRate * 2 * numOfChan);
+  setUint16(numOfChan * 2); setUint16(16);
+  setUint32(0x61746164); setUint32(length - pos - 4);
+  for (let i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+  while (pos < length) {
+    for (let i = 0; i < numOfChan; i++) {
+      sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+      view.setInt16(pos, sample, true); pos += 2;
+    }
+    offset++;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function clearGrid() {
+  if(confirm("Clear the current Melody?")) {
+    stopPlayback();
+    for (let step = 0; step < STEPS; step++) notes[step].fill(0);
+    redrawAll();
+  }
+}
+
+/* -------------------------------------------------
+   PROCEDURAL GENERATION
+   ------------------------------------------------- */
+const SCALES = {
+  'major': [0, 2, 4, 5, 7, 9, 11],
+  'minor': [0, 2, 3, 5, 7, 8, 10],
+  'pentMinor': [0, 3, 5, 7, 10],
+  'blues': [0, 3, 5, 6, 7, 10],
+  'chromatic': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+};
+
+window.generateMelody = function(instIdx, density, root, scaleName, octaveRange, clearExisting = true) {
+  const intervals = SCALES[scaleName];
+  if (!intervals) return;
+
+  const octaves = octaveRange.split('-').map(Number);
+
+  const validPitches = [];
+  for (let o = octaves[0]; o <= octaves[1]; o++) {
+    intervals.forEach(interval => {
+      const semi = (root + interval) % 12;
+      const pitchIdx = (o - 1) * 12 + semi;
+      if (pitchIdx >= 0 && pitchIdx < PITCHES.length) {
+        validPitches.push(pitchIdx);
+      }
+    });
+  }
+
+  if (validPitches.length === 0) return;
+
+  pushUndo();
+
+  if (clearExisting) {
+    const instBit = 1 << instIdx;
+    const pauseBit = 1 << (instIdx + 4);
+    for (let s = 0; s < STEPS; s++) {
+      for (let p = 0; p < PITCHES.length; p++) {
+        notes[s][p] &= ~(instBit | pauseBit);
+      }
+    }
+  }
+
+  const isValid = (p) => validPitches.includes(p);
+
+  for (let s = 0; s < STEPS; s++) {
+    if (Math.random() >= density) continue;
+
+    const existingPitches = [];
+    for (let p = 0; p < PITCHES.length; p++) {
+      const mask = notes[s][p];
+      for (let i = 0; i < 4; i++) {
+        if (i === instIdx) continue;
+        if (mask & (1 << i)) {
+          existingPitches.push(p);
+        }
+      }
+    }
+
+    let chosenPitch = -1;
+
+    if (existingPitches.length > 0) {
+      const referencePitch = Math.max(...existingPitches);
+      const harmonyIntervals = [-12, -7, -5, -4, -3, 3, 4, 5, 7, 12];
+      const shuffledIntervals = harmonyIntervals.sort(() => Math.random() - 0.5);
+
+      for (let interval of shuffledIntervals) {
+        const candidate = referencePitch + interval;
+        if (candidate >= 0 && candidate < PITCHES.length && isValid(candidate)) {
+          chosenPitch = candidate;
+          break;
+        }
+      }
+
+      if (chosenPitch === -1) {
+        const nearPitches = validPitches.filter(p => Math.abs(p - referencePitch) <= 12);
+        if (nearPitches.length > 0) {
+          chosenPitch = nearPitches[Math.floor(Math.random() * nearPitches.length)];
+        }
+      }
+    }
+
+    if (chosenPitch === -1) {
+      chosenPitch = validPitches[Math.floor(Math.random() * validPitches.length)];
+    }
+
+    if (chosenPitch !== -1) {
+      notes[s][chosenPitch] |= (1 << instIdx);
+    }
+  }
+
+  redrawAll();
+};
+
+// --- UI Event Bindings ---
+
+const genModal = document.getElementById('generateModal');
+const genCloseBtn = genModal.querySelector('.close');
+const genDensityInput = document.getElementById('genDensity');
+const genDensityVal = document.getElementById('genDensityVal');
+const doGenerateBtn = document.getElementById('doGenerateBtn');
+
+document.getElementById('generateBtn').addEventListener('click', () => {
+  genModal.style.display = 'block';
+});
+
+genCloseBtn.onclick = () => genModal.style.display = 'none';
+
+window.addEventListener('click', (e) => {
+  if (e.target == genModal) genModal.style.display = 'none';
+});
+
+genDensityInput.addEventListener('input', (e) => {
+  genDensityVal.textContent = e.target.value + '%';
+});
+
+doGenerateBtn.addEventListener('click', () => {
+  const instIdx = parseInt(document.getElementById('genInstrument').value);
+  const density = parseInt(genDensityInput.value) / 100;
+  const root = parseInt(document.getElementById('genKey').value);
+  const scaleName = document.getElementById('genScale').value;
+  
+  // FIX: Read min and max values separately
+  const minOct = document.getElementById('genOctaveMin').value;
+  const maxOct = document.getElementById('genOctaveMax').value;
+  
+  // Construct the range string expected by the generator (e.g., "3-5")
+  const octaveRange = `${minOct}-${maxOct}`;
+
+  window.generateMelody(instIdx, density, root, scaleName, octaveRange);
+  
+  genModal.style.display = 'none';
+});
+
+/* -------------------------------------------------
+   INIT
+   ------------------------------------------------- */
+populateWaveTypeSelector();
+
+const c4Index = PITCHES.indexOf('C4');
+if (c4Index !== -1) {
+    container.scrollTop = c4Index * CELL_H;
+}
+
+redrawAll();
+</script>
+</body>
