@@ -1,0 +1,3596 @@
+<!--
+    Shift+Arrow moves a screen
+    
+    Remember that it is Virtual, the canvas never grows it's a window of the full song.
+    
+    Give me full updated functions, I need to know exactly where to put them. And avoid placeholders like rest of the function
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rollidy 7.7</title>
+<style>
+  .label-row:nth-child(even) {
+    background: var(--pair-row-bg);
+  }
+
+  :root {
+    --bg-color: #111111;
+    --toolbar-bg: #1e1e1e;
+    --toolbar-text: #ffffff;
+    --container-bg: #1a1a1a;
+    --labels-bg: #2a2a2a;
+    --label-border: #333333;
+    --grid-color: #222222;
+    --grid-text: #999999;
+    --highlight-color: rgba(100, 120, 180, 0.2);
+    --highlight-intersection: rgba(120, 140, 200, 0.2);
+    --label-highlight: rgba(100, 120, 180, 0.2);
+    --pair-row-bg: #151515; 
+    --modal-bg: rgba(0, 0, 0, 0.7);
+    --modal-content-bg: #2a2a2a;
+    --modal-border: #444444;
+    --modal-text: #ffffff;
+  }
+  
+  body.light-mode {
+    --bg-color: #ffffff;
+    --toolbar-bg: #f0f0f0;
+    --toolbar-text: #333333;
+    --container-bg: #fafafa;
+    --labels-bg: #f0f0f0;
+    --label-border: #dddddd;
+    --grid-color: #e0e0e0;
+    --grid-text: #666666;
+    --highlight-color: rgba(200, 220, 255, 0.4);
+    --highlight-intersection: rgba(180, 200, 255, 0.2);
+    --pair-row-bg: #e8e8e8; 
+    --modal-bg: rgba(0, 0, 0, 0.5);
+    --modal-content-bg: #ffffff;
+    --modal-border: #cccccc;
+    --modal-text: #333333;
+  }
+  
+  body {font-family:Arial,sans-serif;margin:0;padding:0;overflow:hidden;background-color: var(--bg-color);color: var(--toolbar-text);}
+  #toolbar {padding:10px;background: var(--toolbar-bg);color: var(--toolbar-text);display:flex;align-items:center;flex-wrap:wrap;}
+  #toolbar > * {margin-right:15px;}
+  
+  .instrument-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    display: inline-block;
+    margin-right: 5px;
+    overflow: hidden;
+  }
+  
+  .instrument-btn:hover { transform: scale(1.1); }
+  
+  .instrument-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 10px;
+    overflow: hidden;
+  }
+  
+    /* 
+     Instrument Button Icons 
+     All icons are now triangles touching corners.
+     The container .instrument-icon is 20x10px.
+  */
+
+  /* Instrument 0 (Red) */
+  .inst0-icon::before {
+    content: '';
+    position: absolute;
+    width: 0; 
+    height: 0; 
+    /* Triangle pointing Top-Left */
+    border-right: 10px solid white;
+    border-top: 10px solid transparent;
+    left: 5px;
+    top: 0;
+  }
+
+  /* Instrument 1 (Blue) */
+  .inst1-icon::before {
+    content: '';
+    position: absolute;
+    width: 0; 
+    height: 0; 
+    /* Triangle pointing Top-Right */
+    border-left: 10px solid white;
+    border-top: 10px solid transparent;
+    left: 5px;
+    top: 0;
+  }
+
+  /* Instrument 2 (Green) */
+  .inst2-icon::before {
+    content: '';
+    position: absolute;
+    width: 0; 
+    height: 0; 
+    /* Triangle pointing Bottom-Left */
+    border-right: 10px solid white;
+    border-bottom: 10px solid transparent;
+    left: 5px;
+    top: 0;
+  }
+
+  /* Instrument 3 (Yellow) */
+  .inst3-icon::before {
+    content: '';
+    position: absolute;
+    width: 0; 
+    height: 0; 
+    /* Triangle pointing Bottom-Right */
+    border-left: 10px solid white;
+    border-bottom: 10px solid transparent;
+    left: 5px; /* Centered in 20px container */
+    top: 0;
+  }
+  
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--modal-bg);
+  }
+  
+  .modal-content {
+    background-color: var(--modal-content-bg);
+    margin: 10% auto;
+    padding: 20px;
+    border: 1px solid var(--modal-border);
+    border-radius: 5px;
+    width: 350px; 
+    color: var(--modal-text);
+  }
+  
+  #melodyModal .modal-content {
+    width: 450px;
+    max-width: 90%;
+    display: flex;
+    flex-direction: column;
+    max-height: 80vh;
+  }
+
+  #melodyTableContainer {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    border: 1px solid var(--label-border);
+    max-height: 300px;
+  }
+
+  #melodyTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  #melodyTable th, #melodyTable td {
+    padding: 6px;
+    text-align: left;
+    border-bottom: 1px solid var(--label-border);
+  }
+  
+  #melodyTable th {
+    background: var(--labels-bg);
+    position: sticky;
+    top: 0;
+  }
+  
+  #melodyTable tr:nth-child(even) {
+    background: var(--pair-row-bg);
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  
+  .close {
+    color: var(--modal-text);
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  
+  .close:hover { opacity: 0.7; }
+  
+  .form-group {
+    margin-bottom: 15px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 5px;
+  }
+  
+  .form-group select, .form-group input {
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+    background: var(--container-bg);
+    color: var(--modal-text);
+    border: 1px solid var(--modal-border);
+    border-radius: 3px;
+  }
+  
+  .form-group.side-by-side {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .form-group.side-by-side label {
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+  
+  .form-group.side-by-side select {
+    flex-grow: 1;
+  }
+  
+  #waveCanvas {
+    background: #000;
+    border: 1px solid #444;
+    width: 100%;
+    height: 100px;
+    cursor: crosshair;
+    touch-action: none;
+    display: block;
+  }
+  
+  .wave-container {
+    margin-top: 10px;
+    position: relative;
+  }
+  
+  .wave-center-line {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: #333;
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  #pianoRollContainer {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 50px);
+    display: flex;
+    background: var(--container-bg);
+    overflow: hidden;
+  }
+  
+  /* Drag and Drop Visual Feedback */
+  body.drag-over #pianoRollContainer {
+    border: 3px dashed #4CAF50;
+    background: rgba(76, 175, 80, 0.1);
+    box-sizing: border-box;
+  }
+  
+  body.drag-over {
+    cursor: copy;
+  }
+  
+  #labelsCol {
+    width: 50px;
+    flex-shrink: 0;
+    background: var(--labels-bg);
+    z-index: 10;
+    border-right: 2px solid var(--label-border);
+    box-sizing: border-box;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+  
+  #labelsCol::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .label-row {
+    height: 20px;
+    line-height: 20px;
+    font-size: 10px;
+    text-align: right;
+    padding-right: 5px;
+    border-bottom: 1px solid var(--label-border);
+    background: var(--labels-bg); 
+    box-sizing: border-box;
+  }
+  
+  .label-row.highlight { background: var(--label-highlight); }
+  
+  /* Virtual Grid Spacer: This invisible div forces the scrollbar to appear 
+     for the full length of the song, even though the canvas is small. */
+  #gridSpacer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    /* Width is set by JS dynamically */
+    pointer-events: none; 
+    z-index: 0;
+  }
+  
+  #verticalSpacer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px; /* Just needs to exist */
+    /* Height is set by JS to force scroll */
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* The canvas sits on top and only renders what is visible */
+  #rollCanvas {
+    position: sticky;
+    top: 0;
+    left: 0;
+    width: 100%; /* Canvas width matches viewport, not song length */
+    height: 100%;
+    display: block;
+    z-index: 1;
+    pointer-events: auto;
+  }
+  
+  #canvasScroller {
+    flex-grow: 1;
+    height: 100%;
+    overflow: auto;
+    position: relative;
+    background: var(--grid-color);
+  }
+
+  canvas {display: block;}
+  
+  #playBtn,#stopBtn,#clearBtn,#generateBtn{padding:5px 10px;border:none;color:#fff;cursor:pointer;}
+  #playBtn{background:green;color:white;}
+  #stopBtn{background:yellow;color:black;}
+  #clearBtn{background:red;color:black;}
+  #generateBtn{background:blue;olor:white;}
+  select{padding:2px;}
+
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  
+  .btn-row button {
+    padding: 8px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    background: var(--toolbar-bg);
+    color: var(--toolbar-text);
+    border: 1px solid var(--label-border);
+  }
+  
+  .btn-row button:hover {
+    background: var(--label-border);
+  }
+  
+  
+  /* Progress Modal Styles */
+  #progressModal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    cursor: wait;
+  }
+
+  #progressModalContent {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 300px;
+    background: var(--modal-content-bg);
+    border: 1px solid var(--modal-border);
+    padding: 20px;
+    border-radius: 5px;
+    text-align: center;
+    color: var(--modal-text);
+  }
+
+  #progressBarContainer {
+    width: 100%;
+    background-color: #444;
+    border-radius: 4px;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+
+  #progressBarFill {
+    height: 20px;
+    width: 0%;
+    background-color: #4CAF50;
+    transition: width 0.1s;
+  }
+</style>
+<script>
+/* -------------------------------------------------
+   INSTRUMENT STYLE DICTIONARY (Atomic)
+   ------------------------------------------------- */
+const STYLE = {};
+
+// Base class
+class InstrumentStyle {
+  constructor(name, value) {
+    this.name = name;
+    this.value = value;
+    this.oscillators = new Set();
+  }
+  
+  // 1. STATE: Defines what data this instrument needs to save.
+  // Called when the instrument is selected for the first time.
+  createDefaultState() {
+    return {};
+  }
+
+  // 2. UI: Creates controls.
+  createControls(container, state, audioContext) {
+    container.innerHTML = '';
+  }
+
+  // 3. SAVE: Reads UI inputs and writes to state.
+  saveSettings(state) {}
+
+  // 4. AUDIO: Creates the oscillator.
+  createOscillator(ctx, freq, state) {
+    const osc = ctx.createOscillator();
+    osc.frequency.value = freq;
+    
+    if (ctx instanceof AudioContext) {
+      this.oscillators.add(osc);
+      osc.onended = () => this.oscillators.delete(osc);
+    }
+    return osc;
+  }
+  
+  silence() {
+    this.oscillators.forEach(osc => {
+      try { osc.stop(); } catch (e) {}
+    });
+    this.oscillators.clear();
+  }
+}
+
+// 1. Mute
+STYLE.mute = class extends InstrumentStyle {
+  constructor() { super("Mute", "mute"); }
+  createOscillator(ctx, freq, state) { return null; }
+};
+
+// 2. Sine
+STYLE.sine = class extends InstrumentStyle {
+  constructor() { super("Sine", "sine"); }
+  
+  createDefaultState() {
+    return { hold: false };
+  }
+
+  createControls(container, state, audioContext) {
+    container.innerHTML = `
+      <div class="form-group">
+        <label><input type="checkbox" id="ctrl_hold"> Hold (Legato)</label>
+      </div>`;
+    const chk = document.getElementById('ctrl_hold');
+    if(chk) chk.checked = !!state.hold;
+  }
+
+  saveSettings(state) {
+    const chk = document.getElementById('ctrl_hold');
+    if(chk) state.hold = chk.checked;
+  }
+
+  createOscillator(ctx, freq, state) {
+    const osc = super.createOscillator(ctx, freq, state);
+    if(!osc) return null;
+    osc.type = 'sine';
+    return osc;
+  }
+};
+
+// 3. Square
+STYLE.square = class extends InstrumentStyle {
+  constructor() { super("Square", "square"); }
+  createDefaultState() { return { hold: false }; }
+  createControls(container, state, audioContext) {
+    container.innerHTML = `<div class="form-group"><label><input type="checkbox" id="ctrl_hold"> Hold (Legato)</label></div>`;
+    const chk = document.getElementById('ctrl_hold');
+    if(chk) chk.checked = !!state.hold;
+  }
+  saveSettings(state) {
+    const chk = document.getElementById('ctrl_hold');
+    if(chk) state.hold = chk.checked;
+  }
+  createOscillator(ctx, freq, state) {
+    const osc = super.createOscillator(ctx, freq, state);
+    if(!osc) return null;
+    osc.type = 'square';
+    return osc;
+  }
+};
+
+// 4. Sawtooth
+STYLE.sawtooth = class extends InstrumentStyle {
+  constructor() { super("Sawtooth", "sawtooth"); }
+  createDefaultState() { return { hold: false }; }
+  createControls(container, state, audioContext) {
+    container.innerHTML = `<div class="form-group"><label><input type="checkbox" id="ctrl_hold"> Hold (Legato)</label></div>`;
+    const chk = document.getElementById('ctrl_hold');
+    if(chk) chk.checked = !!state.hold;
+  }
+  saveSettings(state) {
+    const chk = document.getElementById('ctrl_hold');
+    if(chk) state.hold = chk.checked;
+  }
+  createOscillator(ctx, freq, state) {
+    const osc = super.createOscillator(ctx, freq, state);
+    if(!osc) return null;
+    osc.type = 'sawtooth';
+    return osc;
+  }
+};
+
+// 5. Triangle
+STYLE.triangle = class extends InstrumentStyle {
+  constructor() { super("Triangle", "triangle"); }
+  createDefaultState() { return { hold: false }; }
+  createControls(container, state, audioContext) {
+    container.innerHTML = `<div class="form-group"><label><input type="checkbox" id="ctrl_hold"> Hold (Legato)</label></div>`;
+    const chk = document.getElementById('ctrl_hold');
+    if(chk) chk.checked = !!state.hold;
+  }
+  saveSettings(state) {
+    const chk = document.getElementById('ctrl_hold');
+    if(chk) state.hold = chk.checked;
+  }
+  createOscillator(ctx, freq, state) {
+    const osc = super.createOscillator(ctx, freq, state);
+    if(!osc) return null;
+    osc.type = 'triangle';
+    return osc;
+  }
+};
+
+// 6. Custom
+STYLE.custom = class extends InstrumentStyle {
+  constructor() { super("Custom (Draw)", "custom"); }
+  
+  createDefaultState() {
+    const pts = new Float32Array(256);
+    for (let i = 0; i < 256; i++) pts[i] = Math.sin((i / 256) * Math.PI * 2);
+    return { customWavePoints: pts }; // Note: No 'hold' property needed
+  }
+  
+  createControls(container, state, audioContext) {
+    container.innerHTML = `
+      <div class="form-group">
+        <label>Draw Waveform:</label>
+        <div class="wave-container" style="position:relative;">
+          <div class="wave-center-line"></div>
+          <canvas id="waveCanvas" width="256" height="100" style="background:#000; border:1px solid #444; cursor:crosshair; display:block;"></canvas>
+        </div>
+        <div class="btn-row" style="margin-top:5px; grid-template-columns: 1fr;">
+          <button id="resetWaveBtn">Reset (Sine)</button>
+        </div>
+      </div>`;
+      
+    // Ensure state integrity
+    if (!state.customWavePoints) {
+        const def = this.createDefaultState();
+        state.customWavePoints = def.customWavePoints;
+    }
+    
+    this.recalculateCoeffs(state);
+    this.drawWaveCanvas(state);
+    this.attachWaveListeners(state);
+    
+    document.getElementById('resetWaveBtn').onclick = () => {
+      const def = this.createDefaultState();
+      state.customWavePoints = def.customWavePoints;
+      this.recalculateCoeffs(state);
+      this.drawWaveCanvas(state);
+    };
+  }
+  
+  attachWaveListeners(state) {
+    const canvas = document.getElementById('waveCanvas');
+    if(!canvas) return;
+    
+    const handler = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+      const pts = state.customWavePoints;
+      if (!pts) return;
+      
+      const val = 1 - (2 * y / canvas.height);
+      const startIdx = Math.floor((x / canvas.width) * pts.length);
+      const endIdx = Math.min(pts.length, startIdx + 3);
+      for (let i = startIdx; i < endIdx; i++) pts[i] = val;
+      this.drawWaveCanvas(state);
+    };
+    
+    let isDrawing = false;
+    canvas.onmousedown = (e) => { isDrawing = true; handler(e); };
+    canvas.ontouchstart = (e) => { e.preventDefault(); isDrawing = true; handler(e); };
+    
+    // Use window listeners to allow dragging outside the canvas
+    const upHandler = () => { isDrawing = false; };
+    const moveCheck = (e) => { if(isDrawing) handler(e); };
+    
+    window.addEventListener('mousemove', moveCheck);
+    window.addEventListener('mouseup', upHandler);
+    window.addEventListener('touchmove', (e) => { if(isDrawing) { e.preventDefault(); handler(e); } }, {passive:false});
+    window.addEventListener('touchend', upHandler);
+  }
+
+  recalculateCoeffs(state) {
+    const points = state.customWavePoints;
+    if (!points) return;
+    const N = points.length;
+    const harmonics = 32;
+    const real = new Float32Array(harmonics);
+    const imag = new Float32Array(harmonics);
+
+    for (let k = 1; k < harmonics; k++) {
+      let r = 0, i = 0;
+      for (let n = 0; n < N; n++) {
+        const angle = (2 * Math.PI * k * n) / N;
+        r += points[n] * Math.cos(angle);
+        i += points[n] * Math.sin(angle);
+      }
+      real[k] = (r * 2) / N;
+      imag[k] = (i * 2) / N;
+    }
+    state.customCoeffs = { real, imag };
+  }
+  
+  drawWaveCanvas(state) {
+    const canvas = document.getElementById('waveCanvas');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const pts = state.customWavePoints;
+    if (!pts) return;
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.beginPath();
+    ctx.strokeStyle = '#d32f2f';
+    ctx.lineWidth = 2;
+    
+    const h = canvas.height;
+    const w = canvas.width;
+    const mid = h / 2;
+    const scale = mid * 0.9;
+
+    for (let i = 0; i < w; i++) {
+      const idx = Math.floor((i / w) * pts.length);
+      const y = mid - (pts[idx] * scale);
+      if (i === 0) ctx.moveTo(i, y);
+      else ctx.lineTo(i, y);
+    }
+    ctx.stroke();
+  }
+  
+  saveSettings(state) {
+    this.recalculateCoeffs(state);
+  }
+  
+  createOscillator(ctx, freq, state) {
+    const osc = super.createOscillator(ctx, freq, state);
+    if(!osc) return null;
+    
+    if (state.customCoeffs) {
+      const wave = ctx.createPeriodicWave(state.customCoeffs.real, state.customCoeffs.imag);
+      osc.setPeriodicWave(wave);
+    } else {
+      osc.type = 'sine'; 
+    }
+    return osc;
+  }
+};
+
+// -- Helpers --
+
+const styleCache = {};
+
+function getStyle(key) {
+  if (!STYLE[key]) return getStyle('mute');
+  if (!styleCache[key]) styleCache[key] = new STYLE[key]();
+  return styleCache[key];
+}
+
+function getStyleByValue(value) {
+  const key = Object.keys(STYLE).find(k => getStyle(k).value === value);
+  return key ? getStyle(key) : null;
+}
+
+function populateWaveTypeSelector() {
+  const select = document.getElementById('modalStyle');
+  if (!select) return;
+  select.innerHTML = '';
+  Object.keys(STYLE).forEach(key => {
+    const instance = getStyle(key);
+    const option = document.createElement('option');
+    option.value = instance.value;
+    option.textContent = instance.name;
+    select.appendChild(option);
+  });
+}
+</script>
+</head>
+<body>
+<div id="toolbar">
+  <div class="instrument-btn" id="inst0Btn" style="background-color: #d32f2f;" title="Instrument 1">
+    <div class="instrument-icon inst0-icon"></div>
+  </div>
+  <div class="instrument-btn" id="inst1Btn" style="background-color: #1976d2;" title="Instrument 2">
+    <div class="instrument-icon inst1-icon"></div>
+  </div>
+  <div class="instrument-btn" id="inst2Btn" style="background-color: #388e3c;" title="Instrument 3">
+    <div class="instrument-icon inst2-icon"></div>
+  </div>
+  <div class="instrument-btn" id="inst3Btn" style="background-color: #fbc02d;" title="Instrument 4">
+    <div class="instrument-icon inst3-icon"></div>
+  </div>
+  
+  <button id="playBtn">▶ Play</button>
+  <button id="generateBtn">Generate</button>
+  <!-- FIX: Added explicit onclick handler for Clear -->
+  <button id="clearBtn" onclick="clearGrid()">Clear</button>
+  
+  <!-- NEW: Undo / Redo Buttons -->
+  <button id="undoBtn" onclick="undo()" title="Undo (Ctrl+Z)">↶ Undo</button>
+  <button id="redoBtn" onclick="redo()" title="Redo (Ctrl+Y)">↷ Redo</button>
+  
+  <label>BPM <input type="number" id="bpmInput" value="120" min="20" max="300" style="width: 50px;"></label>
+
+  <label>Loop
+    <input type="checkbox" id="loop" />
+  </label>
+
+  <label>Light
+    <input type="checkbox" id="lightMode" />
+  </label>
+  
+  <button id="helpBtn" style="margin-left: auto; background: #333; color: white; border-radius: 50%; width: 24px; height: 24px; padding: 0; line-height: 24px; font-weight: bold;" onclick="showHelp()">?</button>
+</div>
+
+<div id="instrumentModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalTitle">Instrument Settings</h2>
+      <span class="close">&times;</span>
+    </div>
+    <div class="form-group">
+      <label for="modalStyle">Style:</label>
+      <select id="modalStyle">
+        <!-- Options populated by JS -->
+      </select>
+    </div>
+    
+    <!-- Dynamic Container for Instrument Controls -->
+    <div id="styleControlsContainer"></div>
+    
+    <button id="saveInstrumentBtn" style="width: 100%; padding: 8px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">Save Settings</button>
+  </div>
+</div>
+
+<div id="melodyModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Recorded Melody</h2>
+      <span class="close" id="closeMelody">&times;</span>
+    </div>
+    <div id="melodyTableContainer">
+      <table id="melodyTable">
+        <thead>
+          <tr>
+            <th>Note</th>
+            <th>Freq. (Hz)</th>
+            <th>Time (ms)</th>
+            <th>Dur. (ms)</th>
+          </tr>
+        </thead>
+        <tbody id="melodyTableBody">
+        </tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button id="importJsonBtn">Import JSON</button>
+      <button id="importAudioBtn">Import Audio</button>
+      <button id="exportJsonBtn">Export JSON</button>
+      <button id="exportAudioBtn">Export Audio</button>
+    </div>
+    <input type="file" id="jsonFileInput" accept=".json" style="display:none">
+    <input type="file" id="audioFileInput" accept="audio/*" style="display:none">
+  </div>
+</div>
+
+<div id="generateModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Procedural Generation</h2>
+      <span class="close">&times;</span>
+    </div>
+    <div class="form-group">
+      <label for="genInstrument">Target Instrument:</label>
+      <select id="genInstrument">
+        <option value="0">Instrument 1 (Red)</option>
+        <option value="1">Instrument 2 (Blue)</option>
+        <option value="2">Instrument 3 (Green)</option>
+        <option value="3">Instrument 4 (Yellow)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="genDensity">Note Density (%):</label>
+      <input type="range" id="genDensity" min="5" max="80" value="25" style="width: 80%;">
+      <span id="genDensityVal">25%</span>
+    </div>
+    <div class="form-group">
+      <label for="genKey">Root Key:</label>
+      <select id="genKey">
+        <option value="0">C</option><option value="1">C#/Db</option>
+        <option value="2">D</option><option value="3">D#/Eb</option>
+        <option value="4">E</option><option value="5">F</option>
+        <option value="6">F#/Gb</option><option value="7">G</option>
+        <option value="8">G#/Ab</option><option value="9">A</option>
+        <option value="10">A#/Bb</option><option value="11">B</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="genScale">Scale:</label>
+      <select id="genScale">
+        <option value="major">Major</option>
+        <option value="minor">Minor</option>
+        <option value="pentMinor">Pentatonic Minor</option>
+        <option value="blues">Blues</option>
+        <option value="chromatic">Chromatic</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="genOctave">Octave</label>
+      <div id="genOctave" class="form-group side-by-side">
+          <label for="genOctaveMin">Minimum:</label>
+                      
+          <input type="number" id="genOctaveMin" min="1" max="7" value="3" />
+          <label for="genOctaveMax">Maximum:</label>
+          <input type="number" id="genOctaveMax" min="1" max="7" value="4" />
+        </div>
+    </div>
+    <button id="doGenerateBtn" style="width: 100%; padding: 10px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer; font-weight: bold;">Generate Melody</button>
+  </div>
+</div>
+
+<div id="progressModal" class="modal">
+  <div id="progressModalContent">
+    <h3 id="progressTitle">Processing...</h3>
+    <div id="progressBarContainer">
+      <div id="progressBarFill"></div>
+    </div>
+    <p id="progressText">0%</p>
+  </div>
+</div>
+
+<div id="pianoRollContainer">
+  <div id="labelsCol"></div>
+  <div id="canvasScroller">
+    <div id="gridSpacer"></div>
+    <div id="verticalSpacer"></div>
+    <canvas id="rollCanvas"></canvas>
+  </div>
+</div>
+
+<script>
+/* -------------------------------------------------
+   CHUNKED PLAYBACK CONFIGURATION
+   ------------------------------------------------- */
+const CHUNK_BEATS = 64;
+const SCHEDULE_AHEAD_TIME = 0.2; // Seconds to look ahead for next chunk
+
+// Playback State
+let currentChunkIndex = -1;
+let currentChunkSource = null;
+let nextChunkBuffer = null;
+let isPreparingNextChunk = false;
+let chunkStartTime = 0; // AudioContext time when current chunk started
+
+const PITCHES = [];
+for (let oct = 1; oct <= 7; oct++) {
+  const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  notes.forEach(n => PITCHES.push(n + oct));
+}
+PITCHES.reverse();
+
+const SUBDIV = 4;
+let BEATS = 64; 
+let STEPS = BEATS * SUBDIV;
+
+const CELL_W = 40;
+const CELL_H = 20;
+const SCROLLBAR_HEIGHT = 20; 
+
+let TEMPO = 120; 
+let stepSec = (60 / TEMPO) / SUBDIV;
+let isPlaying = false;
+let playRequestId = 0;
+
+/* -------------------------------------------------
+   VIRTUAL CANVAS & RESIZING
+   ------------------------------------------------- */
+
+const gridSpacer = document.getElementById('gridSpacer');
+const verticalSpacer = document.getElementById('verticalSpacer');
+
+function resizeCanvas() {
+  // Set canvas size to match the visible viewport exactly
+  const rect = container.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  
+  // Redraw after resize
+  redrawAll();
+}
+
+// Update the "Virtual" size of the song (the scrollbar area)
+function updateSongLength() {
+  // 1. Horizontal Length (Time)
+  const bufferBeats = 100;
+  const minSteps = (BEATS + bufferBeats) * SUBDIV;
+  const steps = Math.max(notes.length, minSteps);
+  const totalWidth = steps * CELL_W;
+  gridSpacer.style.width = totalWidth + 'px';
+  
+  // 2. Vertical Length (Pitches)
+  // We force the height to accommodate all pitches so we can scroll down
+  const totalHeight = PITCHES.length * CELL_H;
+  verticalSpacer.style.height = totalHeight + 'px';
+  
+  // Ensure our notes array covers this new length
+  expandGridToSteps(steps);
+}
+
+// Initial setup
+window.addEventListener('resize', resizeCanvas);
+
+/* -------------------------------------------------
+   DYNAMIC GRID RESIZING
+   ------------------------------------------------- */
+   
+function expandGridToSteps(newTotalSteps) {
+  const oldSteps = notes.length; // Use actual array length for safety
+
+  // Only expand if needed
+  if (newTotalSteps > oldSteps) {
+    BEATS = Math.ceil(newTotalSteps / SUBDIV);
+    STEPS = BEATS * SUBDIV;
+
+    for (let i = oldSteps; i < STEPS; i++) {
+      notes.push(new Uint8Array(PITCHES.length));
+    }
+  }
+}
+
+/* -------------------------------------------------
+   UNDO / REDO STACKS
+   ------------------------------------------------- */
+const undoStack = [];   
+const redoStack = [];   
+const MAX_STACK = 50;   
+
+function cloneNotes() {
+  return notes.map(row => new Uint8Array(row));
+}
+
+function pushUndo() {
+  if (undoStack.length >= MAX_STACK) undoStack.shift();
+  undoStack.push(cloneNotes());
+  redoStack.length = 0;
+}
+
+/* -------------------------------------------------
+   CLIPBOARD
+   ------------------------------------------------- */
+let clipboard = []; 
+
+/* -------------------------------------------------
+   BPM CHANGE HANDLER
+   ------------------------------------------------- */
+const bpmInput = document.getElementById('bpmInput');
+
+function updateTempo(newTempo) {
+  const val = parseInt(newTempo);
+  if (isNaN(val) || val < 20) TEMPO = 20;
+  else if (val > 300) TEMPO = 300;
+  else TEMPO = val;
+  stepSec = (60 / TEMPO) / SUBDIV;
+  if (isPlaying) stopPlayback(); 
+}
+
+bpmInput.addEventListener('input', (e) => {
+  const val = parseInt(e.target.value);
+  if (!isNaN(val)) updateTempo(val);
+});
+
+bpmInput.addEventListener('blur', (e) => {
+  e.target.value = TEMPO;
+});
+
+/* -------------------------------------------------
+   DATA MODEL (Main App)
+   ------------------------------------------------- */
+const notes = Array.from({ length: STEPS }, () =>
+  new Uint8Array(PITCHES.length)
+);
+
+// Helper to create the default Instrument State
+function createDefaultInstrumentState() {
+  const defaultStyle = getStyle('square');
+  const state = {
+    waveType: defaultStyle.value
+  };
+  const styleDefaults = defaultStyle.createDefaultState();
+  for (let key in styleDefaults) {
+    state[key] = styleDefaults[key];
+  }
+  return state;
+}
+
+const instrumentSettings = [
+  createDefaultInstrumentState(),
+  createDefaultInstrumentState(),
+  createDefaultInstrumentState(),
+  createDefaultInstrumentState()
+];
+
+let currentInstrument = 0;
+
+/* -------------------------------------------------
+   CANVAS & DOM SETUP
+   ------------------------------------------------- */
+const canvas = document.getElementById('rollCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = STEPS * CELL_W;
+// Add padding to height so scrollbar sits under the last row
+canvas.height = PITCHES.length * CELL_H + SCROLLBAR_HEIGHT;
+
+const labelsCol = document.getElementById('labelsCol');
+const container = document.getElementById('canvasScroller'); 
+
+PITCHES.forEach(p => {
+  const div = document.createElement('div');
+  div.className = 'label-row';
+  div.innerText = p;
+  labelsCol.appendChild(div);
+});
+
+// Add a spacer to the labels column to match canvas padding
+// This ensures the label column can scroll "past" C1 just like the canvas
+const spacer = document.createElement('div');
+spacer.style.height = SCROLLBAR_HEIGHT + 'px';
+labelsCol.appendChild(spacer);
+
+container.addEventListener('scroll', () => {
+  labelsCol.scrollTop = container.scrollTop;
+  redrawAll(); // Redraw on scroll to update virtual canvas
+});
+
+/* -------------------------------------------------
+   INSTRUMENT MODAL & CUSTOM WAVE LOGIC
+   ------------------------------------------------- */
+const modal = document.getElementById('instrumentModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalStyle = document.getElementById('modalStyle');
+const saveInstrumentBtn = document.getElementById('saveInstrumentBtn');
+const closeBtn = document.getElementsByClassName('close')[0];
+
+const customWaveGroup = document.getElementById('customWaveGroup');
+const waveCanvas = document.getElementById('waveCanvas');
+
+document.getElementById('inst0Btn').addEventListener('click', () => openInstrumentModal(0));
+document.getElementById('inst1Btn').addEventListener('click', () => openInstrumentModal(1));
+// FIX: The Green button (inst2Btn) listener was missing. It is added below:
+document.getElementById('inst2Btn').addEventListener('click', () => openInstrumentModal(2)); // <--- THIS WAS MISSING
+document.getElementById('inst3Btn').addEventListener('click', () => openInstrumentModal(3));
+
+function openInstrumentModal(instIdx) {
+  currentInstrument = instIdx;
+  const colors = ['Red', 'Blue', 'Green', 'Yellow'];
+  modalTitle.textContent = `${colors[instIdx]} Instrument Settings`;
+  
+  // Get the settings (they are now guaranteed to exist)
+  const currentSettings = instrumentSettings[instIdx];
+  
+  // Set the dropdown
+  modalStyle.value = currentSettings.waveType;
+  
+  // Delegate UI creation
+  const container = document.getElementById('styleControlsContainer');
+  const styleInstance = getStyleByValue(currentSettings.waveType);
+  
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  if (styleInstance) {
+    styleInstance.createControls(container, currentSettings, audioCtx);
+  }
+  
+  modal.style.display = 'block';
+}
+
+modalStyle.addEventListener('change', () => {
+  const selectedValue = modalStyle.value;
+  const state = instrumentSettings[currentInstrument];
+  
+  // Update the waveType immediately
+  state.waveType = selectedValue;
+  
+  // Get the new style instance
+  const styleInstance = getStyleByValue(selectedValue);
+  const container = document.getElementById('styleControlsContainer');
+  
+  if(styleInstance) {
+    // Merge default state for the new instrument type
+    const defaults = styleInstance.createDefaultState();
+    // Copy defaults to current state (shallow merge is fine here)
+    for(let key in defaults) {
+        if(state[key] === undefined) state[key] = defaults[key];
+    }
+    
+    styleInstance.createControls(container, state, audioCtx);
+  }
+});
+
+closeBtn.onclick = function() { modal.style.display = 'none'; }
+
+let isDrawingWave = false;
+
+function handleWaveDraw(e) {
+  const rect = waveCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  const pts = instrumentSettings[currentInstrument].customWavePoints;
+  if (!pts) return;
+  
+  const val = 1 - (2 * y / waveCanvas.height);
+  
+  const startIdx = Math.floor((x / waveCanvas.width) * pts.length);
+  const endIdx = Math.min(pts.length, startIdx + 3); 
+  for (let i = startIdx; i < endIdx; i++) {
+    pts[i] = val;
+  }
+  
+  drawWaveCanvas(currentInstrument);
+}
+
+window.addEventListener('mousemove', (e) => {
+  if (isDrawingWave) handleWaveDraw(e);
+});
+
+window.addEventListener('mouseup', () => {
+  isDrawingWave = false;
+});
+
+saveInstrumentBtn.onclick = function() {
+  const state = instrumentSettings[currentInstrument];
+  const styleInstance = getStyleByValue(state.waveType);
+  
+  // Delegate saving
+  if(styleInstance) {
+    styleInstance.saveSettings(state);
+  }
+  
+  modal.style.display = 'none';
+}
+
+window.onclick = function(event) {
+  if (event.target == modal) modal.style.display = 'none';
+  if (event.target == melodyModal) melodyModal.style.display = 'none';
+  if (event.target == genModal) genModal.style.display = 'none';
+}
+
+/* -------------------------------------------------
+   MELODY PANEL
+   ------------------------------------------------- */
+const melodyModal = document.getElementById('melodyModal');
+const melodyTableBody = document.getElementById('melodyTableBody');
+const closeMelody = document.getElementById('closeMelody');
+const playBtn = document.getElementById('playBtn');
+
+let pressTimer;
+const LONG_PRESS_DURATION = 500; 
+
+function openMelodyPanel() {
+  updateMelodyTable();
+  melodyModal.style.display = 'block';
+}
+
+playBtn.addEventListener('mousedown', (e) => {
+  pressTimer = setTimeout(openMelodyPanel, LONG_PRESS_DURATION);
+});
+
+playBtn.addEventListener('mouseup', (e) => {
+  clearTimeout(pressTimer);
+  if (!melodyModal.style.display || melodyModal.style.display === 'none') {
+    if (isPlaying) stopPlayback(); else startPlayback();
+  }
+});
+
+playBtn.addEventListener('mouseleave', () => clearTimeout(pressTimer));
+playBtn.addEventListener('touchstart', (e) => {
+  pressTimer = setTimeout(openMelodyPanel, LONG_PRESS_DURATION);
+}, {passive: true});
+playBtn.addEventListener('touchend', (e) => {
+  clearTimeout(pressTimer);
+  if (!melodyModal.style.display || melodyModal.style.display === 'none') {
+    if (isPlaying) stopPlayback(); else startPlayback();
+  }
+});
+
+closeMelody.onclick = () => melodyModal.style.display = 'none';
+
+function generateMelodyList() {
+  const list = [];
+  for (let step = 0; step < STEPS; step++) {
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const mask = notes[step][pitch];
+      if (!mask) continue;
+      for (let i = 0; i < 4; i++) {
+        const bit = 1 << i;
+        if (mask & bit) {
+          if (step > 0 && (notes[step-1][pitch] & bit) && instrumentSettings[i].hold) continue;
+          let durationSteps = 1;
+          if (instrumentSettings[i].hold) {
+            for (let k = step + 1; k < STEPS; k++) {
+              if (notes[k][pitch] & bit) durationSteps++; else break;
+            }
+          }
+          list.push({
+            note: PITCHES[pitch],
+            freq: midiToFreq(pitchToMidi(pitch)),
+            time: Math.round(step * stepSec * 1000),
+            duration: Math.round(durationSteps * stepSec * 1000),
+            instrument: i 
+          });
+        }
+      }
+    }
+  }
+  list.sort((a, b) => a.time - b.time);
+  return list;
+}
+
+function updateMelodyTable() {
+  const list = generateMelodyList();
+  melodyTableBody.innerHTML = '';
+  if (list.length === 0) {
+    melodyTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center">No notes recorded</td></tr>';
+    return;
+  }
+  list.forEach(n => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${n.note}</td><td>${n.freq.toFixed(2)}</td><td>${n.time}</td><td>${n.duration}</td>`;
+    melodyTableBody.appendChild(tr);
+  });
+}
+
+/* -------------------------------------------------
+   JSON IMPORT / EXPORT
+   ------------------------------------------------- */
+   
+// Helper function to parse and load JSON data with Progress
+function loadMelodyFromJson(jsonString) {
+  // 1. Show Progress Modal
+  const progressModal = document.getElementById('progressModal');
+  const progressFill = document.getElementById('progressBarFill');
+  const progressText = document.getElementById('progressText');
+  const progressTitle = document.getElementById('progressTitle');
+  
+  progressTitle.textContent = "Importing JSON...";
+  progressFill.style.width = '0%';
+  progressText.textContent = 'Reading file...';
+  progressModal.style.display = 'block';
+
+  let data;
+
+  setTimeout(() => {
+    try {
+      // Phase 1: Parsing
+      progressFill.style.width = '10%';
+      data = JSON.parse(jsonString);
+      progressFill.style.width = '20%';
+      progressText.textContent = 'Validating structure...';
+
+      // Validation
+      if (typeof data !== 'object' || data === null) throw new Error("JSON root must be an object.");
+      if (!data.notes || !Array.isArray(data.notes)) throw new Error("Missing or invalid 'notes' array.");
+      
+      // Handle BPM (Must happen before calculating steps from time)
+      if (data.bpm !== undefined) {
+        if (typeof data.bpm !== 'number' || isNaN(data.bpm) || data.bpm < 20 || data.bpm > 300) throw new Error("Invalid BPM value.");
+        updateTempo(data.bpm);
+        document.getElementById('bpmInput').value = TEMPO;
+      }
+
+      if (data.subdivision !== undefined && data.subdivision !== SUBDIV) {
+        throw new Error(`Subdivision mismatch. Expected ${SUBDIV}, got ${data.subdivision}.`);
+      }
+
+      if (!data.name) data.name = "Imported Composition";
+      if (!data.date) data.date = new Date().toISOString();
+
+      // --- Calculate required grid size ---
+      progressText.textContent = 'Analyzing duration...';
+      let maxStep = 0;
+      
+      data.notes.forEach(n => {
+        if (typeof n.time !== 'number' || typeof n.duration !== 'number') return;
+        const startStep = Math.round(n.time / 1000 / stepSec);
+        const durSteps = Math.round(n.duration / 1000 / stepSec);
+        const endStep = startStep + durSteps;
+        if (endStep > maxStep) maxStep = endStep;
+      });
+
+      const requiredSteps = maxStep + SUBDIV;
+      
+      // 1. Expand Data Array
+      expandGridToSteps(requiredSteps);
+      
+      // 2. Update Visual Scrollbar (The Fix)
+      updateSongLength();
+      // -----------------------------------
+
+      pushUndo();
+
+      // Phase 2: Clear Grid
+      progressFill.style.width = '30%';
+      progressText.textContent = 'Clearing grid...';
+      for (let i = 0; i < notes.length; i++) notes[i].fill(0);
+
+      // Phase 3: Parse Notes
+      const totalNotes = data.notes.length;
+      const batchSize = 100; 
+      let processedCount = 0;
+
+      function processChunk(startIdx) {
+        const endIdx = Math.min(startIdx + batchSize, totalNotes);
+        
+        for (let i = startIdx; i < endIdx; i++) {
+          const n = data.notes[i];
+          if (typeof n.note !== 'string' || typeof n.time !== 'number') continue;
+
+          const pitchIdx = PITCHES.indexOf(n.note);
+          if (pitchIdx === -1) continue;
+
+          const step = Math.round(n.time / 1000 / stepSec);
+          // Safety check against expanded size
+          if (step < 0 || step >= notes.length) continue;
+
+          const durationSteps = Math.round(n.duration / 1000 / stepSec);
+          const instIdx = (n.instrument !== undefined && n.instrument >= 0 && n.instrument < 4) ? n.instrument : 0;
+          const bit = 1 << instIdx;
+
+          for (let k = 0; k < durationSteps; k++) {
+            const s = step + k;
+            if (s < notes.length) notes[s][pitchIdx] |= bit;
+          }
+        }
+
+        processedCount = endIdx;
+        const percent = Math.round(30 + (processedCount / totalNotes) * 70);
+        progressFill.style.width = percent + '%';
+        progressText.textContent = `Processing notes (${processedCount}/${totalNotes})...`;
+
+        if (processedCount < totalNotes) {
+          requestAnimationFrame(() => processChunk(processedCount));
+        } else {
+          progressModal.style.display = 'none';
+          redrawAll();
+          if (isPlaying) stopPlayback();
+        }
+      }
+
+      if (totalNotes > 0) processChunk(0);
+      else {
+        progressModal.style.display = 'none';
+        redrawAll();
+      }
+
+    } catch (e) {
+      progressModal.style.display = 'none';
+      alert("Declarative Error: " + e.message);
+    }
+  }, 50);
+}
+
+// Standard File Input Handler
+const jsonFileInput = document.getElementById('jsonFileInput');
+document.getElementById('importJsonBtn').addEventListener('click', () => jsonFileInput.click());
+
+// --- ADDED: Export Listeners ---
+document.getElementById('exportJsonBtn').addEventListener('click', exportJson);
+document.getElementById('exportAudioBtn').addEventListener('click', exportWav);
+
+jsonFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => loadMelodyFromJson(ev.target.result);
+  reader.readAsText(file);
+  e.target.value = ''; 
+})
+
+/* -------------------------------------------------
+   DRAG AND DROP IMPLEMENTATION
+   ------------------------------------------------- */
+function preventDefaults(e) {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+// 1. Prevent default browser behavior for drag events
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+  document.body.addEventListener(eventName, preventDefaults, false);
+});
+
+// 2. Handle Visual Highlighting
+['dragenter', 'dragover'].forEach(eventName => {
+  document.body.addEventListener(eventName, () => {
+    document.body.classList.add('drag-over');
+  }, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+  document.body.addEventListener(eventName, () => {
+    document.body.classList.remove('drag-over');
+  }, false);
+});
+
+// 3. Handle the Drop
+document.body.addEventListener('drop', (e) => {
+  const dt = e.dataTransfer;
+  const files = dt.files;
+
+  if (files.length > 0) {
+    const file = files[0];
+    const fileName = file.name.toLowerCase();
+    
+    // Check 1: Is it an Audio File? (Check MIME type or common extensions)
+    if (file.type.startsWith('audio/') || /\.(mp3|wav|ogg|flac|aiff|m4a)$/i.test(fileName)) {
+      handleAudioFileImport(file);
+    } 
+    // Check 2: Is it a JSON File?
+    else if (file.type === 'application/json' || fileName.endsWith('.json')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => loadMelodyFromJson(ev.target.result);
+      reader.readAsText(file);
+    } 
+    // Check 3: Unknown file type
+    else {
+      alert("Unsupported file format. Please drop a .json or audio file (mp3, wav, ogg).");
+    }
+  }
+}, false);
+
+/* -------------------------------------------------
+   AUDIO IMPORT
+   ------------------------------------------------- */
+const audioFileInput = document.getElementById('audioFileInput');
+document.getElementById('importAudioBtn').addEventListener('click', () => audioFileInput.click());
+
+// Unified handler for Audio Import (used by Button and Drag/Drop)
+async function handleAudioFileImport(file) {
+  if (!file) return;
+  
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  // 1. Setup Progress Modal
+  const progressModal = document.getElementById('progressModal');
+  const progressFill = document.getElementById('progressBarFill');
+  const progressText = document.getElementById('progressText');
+  const progressTitle = document.getElementById('progressTitle');
+  
+  progressTitle.textContent = "Importing Audio...";
+  progressFill.style.width = '0%';
+  progressText.textContent = 'Reading file...';
+  progressModal.style.display = 'block';
+
+  try {
+    // 2. Read File with Progress
+    const arrayBuffer = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      
+      reader.onprogress = (evt) => {
+        if (evt.lengthComputable) {
+          // Scale file reading to 0% -> 30%
+          const percentLoaded = (evt.loaded / evt.total) * 30;
+          progressFill.style.width = percentLoaded + '%';
+          progressText.textContent = `Reading file... ${Math.round((evt.loaded / evt.total) * 100)}%`;
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+    
+    // 3. Decode Audio (30% -> 60%)
+    progressFill.style.width = '35%';
+    progressText.textContent = 'Decoding audio...';
+    
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    
+    progressFill.style.width = '60%';
+    progressText.textContent = 'Analysis starting...';
+    
+    // 4. Convert to Notes (60% -> 100%)
+    await analyzeAudioBuffer(audioBuffer, progressFill, progressText);
+    
+    progressFill.style.width = '100%';
+    progressText.textContent = 'Done!';
+    
+    setTimeout(() => {
+      progressModal.style.display = 'none';
+    }, 200);
+
+  } catch (err) {
+    console.error(err);
+    progressModal.style.display = 'none';
+    alert("Error processing audio file: " + err.message);
+  }
+}
+
+// Event listener for the file input button
+audioFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  handleAudioFileImport(file);
+  e.target.value = ''; 
+});
+
+/**
+ * Performs a standard Cooley-Tukey FFT on a real-valued segment.
+ * Applies Hanning window internally.
+ * @param {Float32Array} segment - The time-domain audio samples.
+ * @returns {Object} Complex arrays {real, imag}
+ */
+function performFFT(segment) {
+  const n = segment.length;
+  const real = new Float32Array(n);
+  const imag = new Float32Array(n);
+
+  // 1. Apply Hanning Window to reduce spectral leakage
+  for (let i = 0; i < n; i++) {
+    const window = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (n - 1)));
+    real[i] = segment[i] * window;
+    imag[i] = 0;
+  }
+
+  // 2. Bit-reversal permutation
+  for (let i = 0, j = 0; i < n; i++) {
+    if (i < j) {
+      [real[i], real[j]] = [real[j], real[i]];
+      [imag[i], imag[j]] = [imag[j], imag[i]];
+    }
+    let m = n >> 1;
+    while (m >= 1 && j >= m) {
+      j -= m;
+      m >>= 1;
+    }
+    j += m;
+  }
+
+  // 3. Butterfly computations
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (2 * Math.PI) / len;
+    const wreal = Math.cos(ang);
+    const wimag = -Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let ur = 1, ui = 0;
+      for (let j = 0; j < len / 2; j++) {
+        const tr = real[i + j + len / 2] * ur - imag[i + j + len / 2] * ui;
+        const ti = real[i + j + len / 2] * ui + imag[i + j + len / 2] * ur;
+        real[i + j + len / 2] = real[i + j] - tr;
+        imag[i + j + len / 2] = imag[i + j] - ti;
+        real[i + j] += tr;
+        imag[i + j] += ti;
+        const tmpur = ur * wreal - ui * wimag;
+        ui = ur * wimag + ui * wreal;
+        ur = tmpur;
+      }
+    }
+  }
+
+  return { real, imag };
+}
+
+async function analyzeAudioBuffer(buffer, progressFill, progressText) {
+  const data = buffer.getChannelData(0);
+  const sampleRate = buffer.sampleRate;
+  const fftSize = 4096; 
+  const threshold = 0.02; 
+  
+  if (typeof pushUndo === 'function') pushUndo();
+
+  const durationSec = buffer.duration;
+  const stepsNeeded = Math.ceil(durationSec / stepSec);
+
+  if (stepsNeeded > STEPS) {
+    progressText.textContent = `Expanding grid...`;
+    await new Promise(r => setTimeout(r, 50));
+    if (typeof expandGridToSteps === 'function') expandGridToSteps(stepsNeeded);
+  }
+
+  // Reset note grid
+  notes.forEach(step => step.fill(0));
+
+  const totalSteps = stepsNeeded; 
+  
+  const processChunk = async (startStep) => {
+    const batchSize = 50; 
+    const endStep = Math.min(startStep + batchSize, totalSteps);
+    
+    for (let s = startStep; s < endStep; s++) {
+      const startSample = Math.floor(s * stepSec * sampleRate);
+      
+      // Safety check for buffer bounds
+      if (startSample + fftSize > data.length) break;
+
+      // Extract segment directly from data
+      // Note: performFFT handles windowing internally, so we pass the raw segment.
+      const segment = data.subarray(startSample, startSample + fftSize);
+      
+      // Compute spectrum
+      const spectrum = performFFT(segment);
+
+      // Analyze frequencies for MIDI notes 21 (A0) to 108 (C8)
+      for (let midi = 21; midi <= 108; midi++) {
+        const targetFreq = 440 * Math.pow(2, (midi - 69) / 12);
+        const magnitude = getMagnitudeAtFreq(spectrum, targetFreq, sampleRate, fftSize);
+        
+        if (magnitude > threshold) {
+          const pitchIdx = 107 - midi; // Map MIDI to grid (Top-down)
+          if (notes[s] && pitchIdx >= 0 && pitchIdx < notes[s].length) {
+            notes[s][pitchIdx] = 1;
+          }
+        }
+      }
+    }
+    
+    // UI Update (Scale analysis progress: 60% -> 100%)
+    const analysisProgress = (endStep / totalSteps);
+    const totalPercent = 60 + Math.round(analysisProgress * 40);
+    
+    progressFill.style.width = `${totalPercent}%`;
+    progressText.textContent = `Analyzing Polyphony: ${Math.round(analysisProgress * 100)}%`;
+    
+    if (endStep < totalSteps) {
+      await new Promise(r => requestAnimationFrame(r));
+      return processChunk(endStep);
+    }
+  };
+
+  await processChunk(0);
+  if (typeof redrawAll === 'function') redrawAll();
+  return typeof generateMelodyList === 'function' ? generateMelodyList() : null;
+}
+
+// --- HELPER UTILITIES ---
+
+/**
+ * Maps a target frequency to the nearest FFT bin and returns magnitude.
+ */
+function getMagnitudeAtFreq(spectrum, targetFreq, sampleRate, fftSize) {
+  // Calculate bin index
+  const binIndex = Math.round((targetFreq * fftSize) / sampleRate);
+  
+  // Ignore frequencies above Nyquist (FFT size / 2)
+  if (binIndex >= fftSize / 2) return 0;
+
+  const r = spectrum.real[binIndex];
+  const i = spectrum.imag[binIndex];
+  
+  // Return magnitude (normalized)
+  return Math.sqrt(r * r + i * i) / (fftSize / 2);
+}
+
+/* -------------------------------------------------
+   DARK/LIGHT MODE TOGGLE
+   ------------------------------------------------- */
+const lightModeToggle = document.getElementById('lightMode');
+lightModeToggle.addEventListener('change', () => {
+  if (lightModeToggle.checked) document.body.classList.add('light-mode');
+  else document.body.classList.remove('light-mode');
+  redrawAll();
+});
+
+/* -------------------------------------------------
+   SELECTION STATE
+   ------------------------------------------------- */
+let selectedCorners = [];
+let isSelecting = false;
+let isDraggingSelection = false;
+let selectionRect = { x1: 0, y1: 0, x2: 0, y2: 0 };
+let dragStart = { x: 0, y: 0 };
+let dragOffset = { x: 0, y: 0 };
+
+/* -------------------------------------------------
+   COPY / PASTE LOGIC
+   ------------------------------------------------- */
+function handleCopy() {
+  if (selectedCorners.length === 0) return;
+  
+  // Find top-left corner of selection to normalize coordinates
+  let minStep = Infinity, minPitch = Infinity;
+  selectedCorners.forEach(c => {
+    if (c.step < minStep) minStep = c.step;
+    if (c.pitch < minPitch) minPitch = c.pitch;
+  });
+  
+  clipboard = selectedCorners.map(c => ({
+    dStep: c.step - minStep,
+    dPitch: c.pitch - minPitch,
+    instIdx: c.instIdx
+  }));
+}
+
+function handlePaste() {
+  if (clipboard.length === 0) return;
+  
+  pushUndo(); 
+  
+  const anchorStep = (hoverStep >= 0) ? hoverStep : 0;
+  const anchorPitch = (hoverPitch >= 0) ? hoverPitch : 0;
+  
+  let maxStepNeeded = 0;
+  const newSelection = [];
+  
+  // CHANGE: Calculate max step needed first
+  clipboard.forEach(c => {
+    const targetStep = anchorStep + c.dStep;
+    if(targetStep > maxStepNeeded) maxStepNeeded = targetStep;
+  });
+
+  // CHANGE: Expand grid if pasting past the end
+  if (maxStepNeeded >= STEPS) {
+     expandGridToSteps(maxStepNeeded + (SUBDIV * 4));
+     updateSongLength(); // UPDATE: Grow the virtual scrollbar
+  }
+  
+  clipboard.forEach(c => {
+    const targetStep = anchorStep + c.dStep;
+    const targetPitch = anchorPitch + c.dPitch;
+    
+    // Check boundaries (now safe for horizontal)
+    if (targetStep >= 0 && targetStep < STEPS && targetPitch >= 0 && targetPitch < PITCHES.length) {
+      const bit = 1 << c.instIdx;
+      
+      notes[targetStep][targetPitch] |= bit;
+      newSelection.push({ 
+        step: targetStep, 
+        pitch: targetPitch, 
+        instIdx: c.instIdx
+      });
+    }
+  });
+  
+  selectedCorners = newSelection;
+  redrawAll();
+  
+  if (isPlaying) refreshLiveAudio();
+}
+
+/* -------------------------------------------------
+   DRAWING (VIRTUALIZED)
+   ------------------------------------------------- */
+function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+function drawGrid(startStep, endStep, scrollLeft, startPitch, endPitch, scrollTop) {
+  // Use solid colors for brighter grid lines
+  const gridColor = lightModeToggle.checked ? '#bbbbbb' : '#444444';
+  const gridTextColor = getComputedStyle(document.body).getPropertyValue('--grid-text').trim();
+  const pairRowBg = getComputedStyle(document.body).getPropertyValue('--pair-row-bg').trim();
+
+  // 1. Row Stripes (Virtualized)
+  ctx.fillStyle = pairRowBg;
+  for (let y = startPitch; y <= endPitch; y++) {
+    if (y < 0 || y >= PITCHES.length) continue;
+    // Calculate screen Y relative to scroll
+    const screenY = (y * CELL_H) - scrollTop;
+    if (y % 2 === 1) ctx.fillRect(0, screenY, canvas.width, CELL_H);
+  }
+
+  // 2. Vertical Lines (Brighter)
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = startStep; x <= endStep; x++) {
+    const screenX = (x * CELL_W) - scrollLeft;
+    ctx.moveTo(screenX, 0);
+    ctx.lineTo(screenX, canvas.height);
+  }
+  ctx.stroke();
+  
+  // Horizontal lines (Brighter)
+  ctx.beginPath();
+  for (let y = startPitch; y <= endPitch; y++) {
+     const screenY = (y * CELL_H) - scrollTop;
+     ctx.moveTo(0, screenY);
+     ctx.lineTo(canvas.width, screenY);
+  }
+  ctx.stroke();
+  
+  // 3. Beat Numbers
+  ctx.fillStyle = gridTextColor;
+  ctx.font = '12px Arial';
+  ctx.textAlign = 'center';
+  
+  const startBeat = Math.floor(startStep / SUBDIV);
+  const endBeat = Math.ceil(endStep / SUBDIV);
+  
+  for (let b = startBeat; b <= endBeat; b++) {
+    const screenX = (b * CELL_W * SUBDIV) - scrollLeft + (CELL_W * SUBDIV) / 2;
+    ctx.fillText(b + 1, screenX, 14);
+  }
+}
+
+function redrawAll() {
+  if (!ctx) return;
+  clearCanvas();
+  
+  // Calculate visible range (Horizontal)
+  const scrollLeft = container.scrollLeft;
+  const viewWidth = canvas.width; 
+  const startStep = Math.floor(scrollLeft / CELL_W);
+  const endStep = Math.ceil((scrollLeft + viewWidth) / CELL_W);
+  
+  // Calculate visible range (Vertical)
+  const scrollTop = container.scrollTop;
+  const viewHeight = canvas.height;
+  const startPitch = Math.floor(scrollTop / CELL_H);
+  const endPitch = Math.ceil((scrollTop + viewHeight) / CELL_H);
+  
+  drawGrid(startStep, endStep, scrollLeft, startPitch, endPitch, scrollTop);
+  drawNotes(startStep, endStep, scrollLeft, startPitch, endPitch, scrollTop);
+  drawHighlight(scrollLeft, scrollTop);
+  
+  // FIX: Pass scrollTop to selection functions
+  if (isSelecting) drawSelectionBox(scrollLeft, scrollTop);
+  if (selectedCorners.length > 0 && !isDraggingSelection) drawSelectionBorders(scrollLeft, scrollTop);
+  if (isDraggingSelection) drawDraggedNotes(scrollLeft, scrollTop);
+}
+
+// Update the "Virtual" size of the song (the scrollbar area)
+function updateSongLength() {
+  // 1. Horizontal Length (Time)
+  const bufferBeats = 100;
+  const minSteps = (BEATS + bufferBeats) * SUBDIV;
+  const steps = Math.max(notes.length, minSteps);
+  const totalWidth = steps * CELL_W;
+  gridSpacer.style.width = totalWidth + 'px';
+  
+  // 2. Vertical Length (Pitches)
+  // We force the height to accommodate all pitches so we can scroll down
+  const totalHeight = PITCHES.length * CELL_H;
+  verticalSpacer.style.height = totalHeight + 'px';
+  
+  // Ensure our notes array covers this new length
+  expandGridToSteps(steps);
+}
+
+function drawSelectionBox(scrollLeft, scrollTop) {
+  // Convert absolute rect coordinates to screen coordinates
+  const x1 = Math.min(selectionRect.x1, selectionRect.x2) - scrollLeft;
+  const x2 = Math.max(selectionRect.x1, selectionRect.x2) - scrollLeft;
+  
+  // FIX: Apply scrollTop offset to Y coordinates
+  const y1 = Math.min(selectionRect.y1, selectionRect.y2) - scrollTop;
+  const y2 = Math.max(selectionRect.y1, selectionRect.y2) - scrollTop;
+  
+  const w = x2 - x1;
+  const h = y2 - y1;
+  
+  ctx.strokeStyle = lightModeToggle.checked ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5, 5]);
+  ctx.strokeRect(x1, y1, w, h);
+  ctx.setLineDash([]);
+}
+
+function drawSelectionBorders(scrollLeft, scrollTop) {
+  const borderColor = lightModeToggle.checked ? '#000000' : '#ffffff';
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+
+  selectedCorners.forEach(c => {
+    // FIX: Apply scroll offsets to convert grid coords to screen coords
+    const screenX = (c.step * CELL_W) - scrollLeft;
+    const screenY = (c.pitch * CELL_H) - scrollTop;
+    
+    const w2 = CELL_W / 2;
+    const h2 = CELL_H / 2;
+    let cx = screenX;
+    let cy = screenY;
+    if (c.instIdx === 1 || c.instIdx === 3) cx += w2;
+    if (c.instIdx === 2 || c.instIdx === 3) cy += h2;
+
+    ctx.strokeRect(cx, cy, w2, h2);
+  });
+}
+
+function drawDraggedNotes(scrollLeft, scrollTop) {
+  const stepDeltaPx = dragOffset.x;
+  const pitchDeltaPx = dragOffset.y;
+  
+  // Calculate snapped grid movement
+  const snapStep = Math.round(stepDeltaPx / CELL_W);
+  const snapPitch = Math.round(pitchDeltaPx / CELL_H);
+
+  ctx.globalAlpha = 0.6;
+
+  selectedCorners.forEach(c => {
+    // Calculate base screen position
+    const baseScreenX = (c.step * CELL_W) - scrollLeft;
+    const baseScreenY = (c.pitch * CELL_H) - scrollTop;
+    
+    const w2 = CELL_W / 2;
+    const h2 = CELL_H / 2;
+    let cx = baseScreenX;
+    let cy = baseScreenY;
+    if (c.instIdx === 1 || c.instIdx === 3) cx += w2;
+    if (c.instIdx === 2 || c.instIdx === 3) cy += h2;
+
+    // Apply snapped offset for visual
+    const finalX = cx + (snapStep * CELL_W);
+    const finalY = cy + (snapPitch * CELL_H);
+
+    ctx.fillStyle = getWaveColor(c.instIdx);
+    ctx.fillRect(finalX + 1, finalY + 1, w2 - 2, h2 - 2);
+    
+    ctx.strokeStyle = lightModeToggle.checked ? '#000' : '#fff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(finalX, finalY, w2, h2);
+  });
+
+  ctx.globalAlpha = 1.0;
+}
+
+let hoverStep = -1;
+let hoverPitch = -1;
+
+function drawHighlight(scrollLeft, scrollTop) {
+  if (isSelecting || isDraggingSelection) return;
+  if (hoverStep < 0 || hoverPitch < 0) return;
+  
+  const highlightColor = getComputedStyle(document.body).getPropertyValue('--highlight-color').trim();
+  const highlightIntersection = getComputedStyle(document.body).getPropertyValue('--highlight-intersection').trim();
+  
+  // Calculate screen position relative to scroll
+  const screenX = (hoverStep * CELL_W) - scrollLeft;
+  const screenY = (hoverPitch * CELL_H) - scrollTop; // FIX: Added scrollTop
+
+  // Only draw if on screen
+  if (screenX < -CELL_W || screenX > canvas.width) return;
+  if (screenY < -CELL_H || screenY > canvas.height) return;
+
+  ctx.fillStyle = highlightColor;
+  ctx.fillRect(screenX, 0, CELL_W, canvas.height);
+  
+  ctx.fillStyle = highlightIntersection;
+  ctx.fillRect(screenX, screenY, CELL_W, CELL_H);
+}
+
+function drawNotes(startStep, endStep, scrollLeft, startPitch, endPitch, scrollTop) {
+  // Iterate only through visible steps and pitches
+  for (let step = startStep; step <= endStep; step++) {
+    if (step < 0 || step >= notes.length) continue;
+
+    // Optimization: Only iterate visible pitches
+    for (let pitch = startPitch; pitch <= endPitch; pitch++) {
+      if (pitch < 0 || pitch >= PITCHES.length) continue;
+
+      const mask = notes[step][pitch];
+      if (!mask) continue;
+      
+      // Calculate screen position
+      const screenX = (step * CELL_W) - scrollLeft;
+      const screenY = (pitch * CELL_H) - scrollTop;
+      
+      for (let i = 0; i < 4; i++) {
+        if (mask & (1 << i)) {
+           // Skip drawing if currently dragging this note
+           if (isDraggingSelection && selectedCorners.some(c => c.step===step && c.pitch===pitch && c.instIdx===i)) continue;
+           drawCorner(screenX, screenY, i);
+        }
+      }
+    }
+  }
+}
+
+function drawCorner(cellX, cellY, instIdx) {
+  const w = CELL_W / 2;
+  const h = CELL_H / 2;
+  let cx = cellX;
+  let cy = cellY;
+  
+  // Determine which quadrant to draw in
+  if (instIdx === 1) cx = cellX + w;
+  if (instIdx === 2) cy = cellY + h;
+  if (instIdx === 3) { cx = cellX + w; cy = cellY + h; }
+  
+  // Draw the colored background
+  ctx.fillStyle = getWaveColor(instIdx);
+  ctx.fillRect(cx + 1, cy + 1, w - 2, h - 2);
+
+  // Setup styles for the triangle icon
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#333333';
+  ctx.lineWidth = 1;
+
+  // Padding from the edge of the sub-cell
+  const pad = 2;
+
+  // Draw a triangle touching all three relevant corners based on quadrant
+  ctx.beginPath();
+  
+  switch (instIdx) {
+    case 0: // Top-Left -> Triangle points Bottom-Left
+      ctx.moveTo(cx + w - pad, cy + pad);         // Top-Right corner
+      ctx.lineTo(cx + w - pad, cy + h - pad);     // Bottom-Right corner
+      ctx.lineTo(cx + pad, cy + h - pad);         // Bottom-Left corner
+      break;
+    case 1: // Top-Right -> Triangle points Bottom-Right
+      ctx.moveTo(cx + pad, cy + pad);             // Top-Left corner
+      ctx.lineTo(cx + w - pad, cy + h - pad);     // Bottom-Right corner
+      ctx.lineTo(cx + pad, cy + h - pad);         // Bottom-Left corner
+      break;
+    case 2: // Bottom-Left -> Triangle points Top-Left
+      ctx.moveTo(cx + pad, cy + pad);             // Top-Left corner
+      ctx.lineTo(cx + w - pad, cy + pad);         // Top-Right corner
+      ctx.lineTo(cx + w - pad, cy + h - pad);     // Bottom-Right corner
+      break;
+    case 3: // Bottom-Right -> Triangle points Top-Right
+      ctx.moveTo(cx + pad, cy + pad);             // Top-Left corner
+      ctx.lineTo(cx + w - pad, cy + pad);         // Top-Right corner
+      ctx.lineTo(cx + pad, cy + h - pad);         // Bottom-Left corner
+      break;
+  }
+  
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
+function getWaveColor(i) {
+  const colors = ['#d32f2f', '#1976d2', '#388e3c', '#fbc02d'];
+  return colors[i % colors.length];
+}
+
+/* -------------------------------------------------
+   INTERACTION LOGIC (UPDATED FOR SCROLL)
+   ------------------------------------------------- */
+   
+function toggleNoteAt(mouseX, mouseY, scrollLeft, scrollTop, isCtrlClick = false) {
+  // Convert screen mouse X/Y to absolute grid step/pitch
+  let step = Math.floor((mouseX + scrollLeft) / CELL_W);
+  // FIX: Add scrollTop to calculation
+  const pitch = Math.floor((mouseY + scrollTop) / CELL_H); 
+
+  // Auto-Expand if clicking in empty space at the end
+  if (step >= notes.length) {
+     expandGridToSteps(step + (SUBDIV * 4));
+     updateSongLength(); // UPDATE: Grow the virtual scrollbar immediately
+  }
+
+  if (step < 0 || step >= notes.length || pitch < 0 || pitch >= PITCHES.length) return;
+  
+  pushUndo(); 
+  
+  // FIX: Add scrollTop to relative calculation
+  const relX = (mouseX + scrollLeft) - (step * CELL_W); 
+  const relY = (mouseY + scrollTop) - (pitch * CELL_H);
+  
+  const left = relX < CELL_W / 2;
+  const top = relY < CELL_H / 2;
+  const instIdx = (top ? 0 : 2) + (left ? 0 : 1);
+  
+  const instBit = 1 << instIdx;
+  if (notes[step][pitch] & instBit) {
+    notes[step][pitch] &= ~instBit; 
+  } else {
+    notes[step][pitch] |= instBit; 
+  }
+  
+  redrawAll();
+  
+  if (isPlaying) refreshLiveAudio();
+}
+
+function deleteSelectedNotes() {
+  if (selectedCorners.length === 0) return;
+  
+  pushUndo(); // Save state for undo
+  
+  selectedCorners.forEach(c => {
+    const bit = 1 << c.instIdx;
+    notes[c.step][c.pitch] &= ~bit;
+  });
+  
+  selectedCorners = []; // Clear selection
+  redrawAll(); // Redraw to show notes are gone AND selection is gone
+  
+  // Refresh audio if currently playing
+  if (isPlaying) refreshLiveAudio();
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  redoStack.push(cloneNotes());
+  const previous = undoStack.pop();
+  for (let i = 0; i < STEPS; i++) notes[i] = new Uint8Array(previous[i]);
+  selectedCorners = []; // Deselect on undo
+  redrawAll();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(cloneNotes());
+  const next = redoStack.pop();
+  for (let i = 0; i < STEPS; i++) notes[i] = new Uint8Array(next[i]);
+  selectedCorners = []; // Deselect on redo
+  redrawAll();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(cloneNotes());
+  const next = redoStack.pop();
+  for (let i = 0; i < STEPS; i++) notes[i] = new Uint8Array(next[i]);
+  selectedCorners = []; // Deselect on redo
+  redrawAll();
+}
+
+/* -------------------------------------------------
+   MOVE SELECTION HELPER
+   ------------------------------------------------- */
+
+function moveSelection(dStep, dPitch) {
+  if (selectedCorners.length === 0) return;
+
+  // 1. Calculate new positions and validate bounds
+  let maxStepNeeded = 0;
+  const newCorners = [];
+  
+  for (let c of selectedCorners) {
+    const newStep = c.step + dStep;
+    const newPitch = c.pitch + dPitch;
+    
+    // Track the furthest step needed
+    if (newStep > maxStepNeeded) maxStepNeeded = newStep;
+
+    // Check vertical boundaries (pitches cannot be auto-expanded)
+    if (newPitch < 0 || newPitch >= PITCHES.length) {
+      return; // Stop if any note goes out of vertical bounds
+    }
+    
+    newCorners.push({
+      step: newStep,
+      pitch: newPitch,
+      instIdx: c.instIdx
+    });
+  }
+
+  // CHANGE: Expand grid if we dragged past the end
+  if (maxStepNeeded >= STEPS) {
+     expandGridToSteps(maxStepNeeded + (SUBDIV * 4));
+     updateSongLength(); // UPDATE: Grow the virtual scrollbar
+  }
+
+  // Re-check boundaries now that grid is potentially expanded
+  // (Horizontal check is effectively handled by expansion, vertical already done)
+  // But we must ensure we don't go negative
+  for(let c of newCorners) {
+      if(c.step < 0) return; 
+  }
+
+  // 2. Save state for Undo
+  pushUndo();
+
+  // 3. Apply changes
+  selectedCorners.forEach(c => {
+    const bit = 1 << c.instIdx;
+    notes[c.step][c.pitch] &= ~bit;
+  });
+
+  newCorners.forEach(c => {
+    const bit = 1 << c.instIdx;
+    notes[c.step][c.pitch] |= bit;
+  });
+
+  // 4. Update selection state
+  selectedCorners = newCorners;
+  
+  redrawAll();
+  
+  if (isPlaying) refreshLiveAudio();
+}
+
+/* -------------------------------------------------
+   FLIP SELECTION HELPERS
+   ------------------------------------------------- */
+
+function flipSelectionHorizontal() {
+  if (selectedCorners.length === 0) return;
+
+  // 1. Calculate Bounding Box
+  let minStep = Infinity, maxStep = -Infinity;
+  selectedCorners.forEach(c => {
+    if (c.step < minStep) minStep = c.step;
+    if (c.step > maxStep) maxStep = c.step;
+  });
+
+  // Center of the selection in steps
+  const centerX = (minStep + maxStep) / 2;
+
+  pushUndo();
+
+  // 2. Clear old positions first
+  selectedCorners.forEach(c => {
+    const bit = 1 << c.instIdx;
+    notes[c.step][c.pitch] &= ~bit;
+  });
+
+  // 3. Calculate and place new positions
+  const newCorners = [];
+  
+  selectedCorners.forEach(c => {
+    // New Step = Center + (Center - Old Step) = 2*Center - Old Step
+    const newStep = Math.round(2 * centerX - c.step);
+
+    // Boundary check
+    if (newStep >= 0 && newStep < STEPS) {
+      const bit = 1 << c.instIdx;
+      // Use c.pitch directly
+      notes[newStep][c.pitch] |= bit;
+      
+      newCorners.push({
+        step: newStep,
+        pitch: c.pitch,
+        instIdx: c.instIdx
+      });
+    }
+  });
+
+  selectedCorners = newCorners;
+  redrawAll();
+  if (isPlaying) refreshLiveAudio();
+}
+
+function flipSelectionVertical() {
+  if (selectedCorners.length === 0) return;
+
+  // 1. Calculate Bounding Box
+  let minPitch = Infinity, maxPitch = -Infinity;
+  selectedCorners.forEach(c => {
+    if (c.pitch < minPitch) minPitch = c.pitch;
+    if (c.pitch > maxPitch) maxPitch = c.pitch;
+  });
+
+  // Center of the selection in pitches
+  const centerY = (minPitch + maxPitch) / 2;
+
+  pushUndo();
+
+  // 2. Prepare new positions
+  const newCorners = [];
+
+  // Clear old positions first
+  selectedCorners.forEach(c => {
+    const bit = 1 << c.instIdx;
+    notes[c.step][c.pitch] &= ~bit;
+  });
+
+  // Calculate and place new positions
+  selectedCorners.forEach(c => {
+    // New Pitch = Center + (Center - Old Pitch) = 2*Center - Old Pitch
+    const newPitch = Math.round(2 * centerY - c.pitch);
+    
+    // Step remains the same
+    const newStep = c.step;
+
+    // Boundary check
+    if (newPitch >= 0 && newPitch < PITCHES.length) {
+      const bit = 1 << c.instIdx;
+      notes[newStep][newPitch] |= bit;
+      
+      newCorners.push({
+        step: newStep,
+        pitch: newPitch,
+        instIdx: c.instIdx
+      });
+    }
+  });
+
+  selectedCorners = newCorners;
+  redrawAll();
+  if (isPlaying) refreshLiveAudio();
+}
+
+/* -------------------------------------------------
+   EVENT LISTENERS
+   ------------------------------------------------- */
+
+window.addEventListener('keydown', e => {
+  const active = document.activeElement;
+  // Ignore shortcuts if typing in an input field
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')) return;
+  
+  // Handle Delete / Backspace
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault(); 
+    deleteSelectedNotes();
+    return;
+  }
+
+  // Handle Copy (C)
+  if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
+    e.preventDefault();
+    handleCopy();
+    return;
+  }
+
+  // Handle Paste (V)
+  if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
+    e.preventDefault();
+    handlePaste();
+    return;
+  }
+
+  // Handle Cut (X)
+  if (e.key === 'x' || e.key === 'X') {
+    e.preventDefault();
+    handleCopy(); // Copy first
+    deleteSelectedNotes(); // Then delete
+    return;
+  }
+  
+  // Handle Select All (A)
+  if (e.key === 'a' || e.key === 'A') {
+    e.preventDefault();
+    
+    // If Ctrl is held, we add to selection, otherwise we replace it
+    if (!e.ctrlKey) selectedCorners = [];
+      
+    // Iterate through the entire grid to find notes
+    for (let step = 0; step < STEPS; step++) {
+      for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+        const mask = notes[step][pitch];
+        if (mask === 0) continue;
+          
+        // Check all 4 instruments
+        for (let i = 0; i < 4; i++) {
+          const instBit = 1 << i;
+
+          if (mask & instBit) {
+            selectedCorners.push({ step, pitch, instIdx: i});
+          }
+        }
+      }
+    }
+    redrawAll();
+    return;
+  }
+
+  // Undo (Z)
+  if (e.key === 'z' || e.key === 'Z') { 
+    e.preventDefault(); 
+    undo(); 
+    return; 
+  }
+  
+  // Redo (Y)
+  if (e.key === 'y' || e.key === 'Y') { 
+    e.preventDefault(); 
+    redo(); 
+    return; 
+  }
+  
+  // Handle Flip Vertical (V)
+  if (e.key === 'v' || e.key === 'V') {
+    // Only flip if we aren't typing in an input field
+    if (!(active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA'))) {
+      e.preventDefault();
+      flipSelectionVertical();
+      return;
+    }
+  }
+
+  // Handle Flip Horizontal (H)
+  if (e.key === 'h' || e.key === 'H') {
+    if (!(active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA'))) {
+      e.preventDefault();
+      flipSelectionHorizontal();
+      return;
+    }
+  }
+
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (isPlaying) stopPlayback(); else startPlayback();
+    return;
+  }
+  
+    // Ctrl + Arrow Keys: Move Selection
+    if (e.ctrlKey) {
+      let dStep = 0, dPitch = 0;
+      if (e.key === 'ArrowUp') dPitch = -1;
+      if (e.key === 'ArrowDown') dPitch = 1;
+      if (e.key === 'ArrowLeft') dStep = -1;
+      if (e.key === 'ArrowRight') dStep = 1;
+      
+      moveSelection(dStep, dPitch);
+   } else if (e.shiftKey) { // Shift + Arrow Keys: Pan View by Screen
+      e.preventDefault(); // Prevent browser history navigation (Back/Forward)
+    
+      const viewW = container.clientWidth;
+      const viewH = container.clientHeight;
+    
+      switch (e.key) {
+        case 'ArrowUp': container.scrollTop -= viewH; break;
+        case 'ArrowDown': container.scrollTop += viewH; break;
+        case 'ArrowLeft': container.scrollLeft -= viewW; break;
+        case 'ArrowRight': container.scrollLeft += viewW; break;
+      }
+    } else {
+      // Arrow Keys (No Ctrl): Pan View
+      switch (e.key) {
+        case 'ArrowUp': container.scrollTop -= CELL_H; break;
+        case 'ArrowDown': container.scrollTop += CELL_H; break;
+        case 'ArrowLeft': container.scrollLeft -= CELL_W; break;
+        case 'ArrowRight': container.scrollLeft += CELL_W; break;
+      }
+    }
+});
+
+window.addEventListener('keydown', e => { if (e.key === 'Control') canvas.style.cursor = 'crosshair'; });
+window.addEventListener('keyup', e => { if (e.key === 'Control') canvas.style.cursor = 'default'; });
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+let isPanning = false;
+let panStartX, panStartY;
+let panStartScrollLeft, panStartScrollTop;
+let isDrawing = false;
+let isDragging = false;
+let startX = 0, startY = 0;
+const DRAG_THRESHOLD = 3;
+let isCtrlDrawing = false; 
+let lastMouseX = 0, lastMouseY = 0;
+
+function getCornerAt(mx, my, scrollLeft, scrollTop) {
+  const step = Math.floor((mx + scrollLeft) / CELL_W);
+  // FIX: Add scrollTop to calculation
+  const pitch = Math.floor((my + scrollTop) / CELL_H); 
+  
+  if (step < 0 || step >= notes.length || pitch < 0 || pitch >= PITCHES.length) return null;
+  
+  const relX = (mx + scrollLeft) - step * CELL_W;
+  // FIX: Add scrollTop to calculation
+  const relY = (my + scrollTop) - pitch * CELL_H; 
+  
+  const left = relX < CELL_W / 2;
+  const top = relY < CELL_H / 2;
+  const instIdx = (top ? 0 : 2) + (left ? 0 : 1);
+  
+  const mask = notes[step][pitch];
+  const isInst = (mask & (1 << instIdx)) !== 0;
+  
+  if (isInst) {
+    return { step, pitch, instIdx };
+  }
+  return null;
+}
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const scrollLeft = container.scrollLeft;
+  const scrollTop = container.scrollTop; // GET SCROLL TOP
+
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+  
+  // PASS scrollTop to helper
+  const clickedCorner = getCornerAt(mx, my, scrollLeft, scrollTop);
+
+  if (e.button === 0 && e.ctrlKey) {
+    if (e.shiftKey && clickedCorner) {
+        const selectedIndex = selectedCorners.findIndex(c => 
+          c.step === clickedCorner.step && 
+          c.pitch === clickedCorner.pitch && 
+          c.instIdx === clickedCorner.instIdx
+        );
+        if (selectedIndex !== -1) {
+          selectedCorners.splice(selectedIndex, 1);
+          redrawAll();
+        }
+        return;
+    }
+    
+    if (clickedCorner) {
+      const isSelected = selectedCorners.some(c => 
+        c.step === clickedCorner.step && 
+        c.pitch === clickedCorner.pitch && 
+        c.instIdx === clickedCorner.instIdx
+      );
+
+      if (isSelected) {
+        isDraggingSelection = true; 
+        dragStart.x = mx; 
+        dragStart.y = my;
+      } else {
+        selectedCorners.push(clickedCorner);
+        redrawAll();
+      }
+      return; 
+    }
+    
+    isSelecting = true;
+    // Store absolute coordinates (adding scrollTop)
+    selectionRect.x1 = mx + scrollLeft;
+    selectionRect.y1 = my + scrollTop; // FIX
+    selectionRect.x2 = mx + scrollLeft;
+    selectionRect.y2 = my + scrollTop; // FIX
+    selectedCorners = [];
+    return;
+  }
+
+  if (e.button === 2) { 
+    if (!e.ctrlKey) return;
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    panStartScrollLeft = container.scrollLeft;
+    panStartScrollTop = container.scrollTop;
+    canvas.style.cursor = 'grabbing';
+  } else if (e.button === 0) { 
+    if (selectedCorners.length > 0) {
+      selectedCorners = [];
+      redrawAll();
+    }
+    
+    isDrawing = true;
+    isDragging = false;
+    isCtrlDrawing = e.ctrlKey; 
+    startX = mx;
+    startY = my;
+  }
+});
+
+window.addEventListener('mousemove', e => {
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+  
+  if (isPanning) {
+    const dx = e.clientX - panStartX;
+    const dy = e.clientY - panStartY;
+    container.scrollLeft = panStartScrollLeft - dx;
+    container.scrollTop = panStartScrollTop - dy;
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const scrollLeft = container.scrollLeft;
+  const scrollTop = container.scrollTop; 
+
+  if (isSelecting) {
+    selectionRect.x2 = mx + scrollLeft;
+    selectionRect.y2 = my + scrollTop; 
+    redrawAll();
+    return;
+  }
+
+  if (isDraggingSelection) {
+    dragOffset.x = mx - dragStart.x;
+    dragOffset.y = my - dragStart.y;
+    
+    // --- NEW: Check if hovering over Clear Button ---
+    const clearBtn = document.getElementById('clearBtn');
+    const btnRect = clearBtn.getBoundingClientRect();
+    if (lastMouseX >= btnRect.left && lastMouseX <= btnRect.right &&
+        lastMouseY >= btnRect.top && lastMouseY <= btnRect.bottom) {
+      canvas.style.cursor = 'not-allowed'; // Indicate deletion
+    } else {
+      canvas.style.cursor = 'default';
+    }
+    // ----------------------------------------------
+
+    redrawAll();
+    return;
+  }
+
+  // Hover Logic
+  const s = Math.floor((mx + scrollLeft) / CELL_W);
+  const p = Math.floor((my + scrollTop) / CELL_H);
+  
+  if (s !== hoverStep || p !== hoverPitch) {
+    hoverStep = s;
+    hoverPitch = p;
+    if (!isDrawing) redrawAll(); 
+  }
+  
+  if (!isDrawing) return;
+  
+  const distX = Math.abs(mx - startX);
+  const distY = Math.abs(my - startY);
+  if (!isDragging && (distX > DRAG_THRESHOLD || distY > DRAG_THRESHOLD)) isDragging = true;
+  if (isDragging) {
+    toggleNoteAt(mx, my, scrollLeft, scrollTop, isCtrlDrawing);
+    startX = mx;
+  }
+});
+
+window.addEventListener('mouseup', e => {
+  const scrollLeft = container.scrollLeft;
+  const scrollTop = container.scrollTop; 
+
+  // --- FIX: Box Selection Logic ---
+  if (isSelecting) {
+    isSelecting = false;
+    
+    // 1. Normalize the selection rectangle to absolute pixel coordinates
+    const x1 = Math.min(selectionRect.x1, selectionRect.x2);
+    const x2 = Math.max(selectionRect.x1, selectionRect.x2);
+    const y1 = Math.min(selectionRect.y1, selectionRect.y2);
+    const y2 = Math.max(selectionRect.y1, selectionRect.y2);
+    
+    // 2. Convert pixel bounds to grid bounds (Steps and Pitches)
+    const startStep = Math.max(0, Math.floor(x1 / CELL_W));
+    const endStep = Math.min(notes.length - 1, Math.floor(x2 / CELL_W));
+    const startPitch = Math.max(0, Math.floor(y1 / CELL_H));
+    const endPitch = Math.min(PITCHES.length - 1, Math.floor(y2 / CELL_H));
+    
+    // 3. Iterate through the grid cells within the selection
+    for (let step = startStep; step <= endStep; step++) {
+      for (let pitch = startPitch; pitch <= endPitch; pitch++) {
+        const mask = notes[step][pitch];
+        if (mask === 0) continue;
+        
+        const cellX = step * CELL_W;
+        const cellY = pitch * CELL_H;
+        const w2 = CELL_W / 2;
+        const h2 = CELL_H / 2;
+        
+        // Check each of the 4 instrument quadrants for intersection
+        if (mask & 1) {
+          if (x2 > cellX && x1 < cellX + w2 && y2 > cellY && y1 < cellY + h2) {
+            selectedCorners.push({ step, pitch, instIdx: 0 });
+          }
+        }
+        if (mask & 2) {
+          if (x2 > cellX + w2 && x1 < cellX + CELL_W && y2 > cellY && y1 < cellY + h2) {
+            selectedCorners.push({ step, pitch, instIdx: 1 });
+          }
+        }
+        if (mask & 4) {
+          if (x2 > cellX && x1 < cellX + w2 && y2 > cellY + h2 && y1 < cellY + CELL_H) {
+            selectedCorners.push({ step, pitch, instIdx: 2 });
+          }
+        }
+        if (mask & 8) {
+          if (x2 > cellX + w2 && x1 < cellX + CELL_W && y2 > cellY + h2 && y1 < cellY + CELL_H) {
+            selectedCorners.push({ step, pitch, instIdx: 3 });
+          }
+        }
+      }
+    }
+    
+    redrawAll();
+    return;
+  }
+
+  if (isDraggingSelection) {
+    // --- NEW: Check for Drop on "Clear" Button ---
+    const clearBtn = document.getElementById('clearBtn');
+    const rect = clearBtn.getBoundingClientRect();
+    const isOverClear = (lastMouseX >= rect.left && lastMouseX <= rect.right &&
+                         lastMouseY >= rect.top && lastMouseY <= rect.bottom);
+
+    if (isOverClear) {
+        // Dropped on Clear -> Delete Selected Notes
+        deleteSelectedNotes();
+    } else {
+        // Standard Move Logic
+        const dStep = Math.round(dragOffset.x / CELL_W);
+        const dPitch = Math.round(dragOffset.y / CELL_H);
+
+        if (dStep !== 0 || dPitch !== 0) {
+           moveSelection(dStep, dPitch);
+        }
+    }
+    // ---------------------------------------------
+
+    isDraggingSelection = false;
+    dragOffset.x = 0; 
+    dragOffset.y = 0;
+    canvas.style.cursor = 'default'; 
+    return;
+  }
+
+  if (isPanning) {
+    isPanning = false;
+    canvas.style.cursor = 'default';
+  }
+  
+  if (isDrawing) {
+    if (!isDragging) {
+      const rect = canvas.getBoundingClientRect();
+      const mx = lastMouseX - rect.left;
+      const my = lastMouseY - rect.top;
+      toggleNoteAt(mx, my, scrollLeft, scrollTop, isCtrlDrawing);
+    }
+    isDrawing = false;
+    isDragging = false;
+    isCtrlDrawing = false;
+    startX = startY = 0;
+  }
+});
+
+let lastTouchCenter = null;
+
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    toggleNoteAt(touch.clientX - rect.left, touch.clientY - rect.top, false); 
+  } else if (e.touches.length === 2) {
+    lastTouchCenter = getTouchCenter(e.touches);
+  }
+  e.preventDefault(); 
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 1) {
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    toggleNoteAt(touch.clientX - rect.left, touch.clientY - rect.top, false);
+  } else if (e.touches.length === 2 && lastTouchCenter) {
+    const newCenter = getTouchCenter(e.touches);
+    const dx = newCenter.x - lastTouchCenter.x;
+    const dy = newCenter.y - lastTouchCenter.y;
+    container.scrollLeft -= dx;
+    container.scrollTop -= dy;
+    lastTouchCenter = newCenter;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  if (e.touches.length < 2) lastTouchCenter = null;
+});
+
+function getTouchCenter(touches) {
+  return {
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2
+  };
+}
+
+/* -------------------------------------------------
+   AUDIO UTILS
+   ------------------------------------------------- */
+let audioCtx = null; 
+let playSource = null; 
+
+function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+function pitchToMidi(idx) {
+  // PITCHES[0] is B7 (MIDI 107), PITCHES[last] is C1 (MIDI 24)
+  // Formula: Highest MIDI (107) - index
+  return 107 - idx; 
+}
+
+function scheduleNote(ctx, start, dur, pitchIdx, instIdx) {
+  start = Math.max(0, start);
+  if (dur <= 0) return;
+
+  const freq = midiToFreq(pitchToMidi(pitchIdx));
+  const setting = instrumentSettings[instIdx];
+  
+  // FIX: Check Mute setting
+  if (setting.waveType === 'mute') return;
+
+  const style = getStyle(setting.waveType);
+  if (!style) return;
+
+  const osc = style.createOscillator(ctx, freq, { customCoeffs: setting.customCoeffs });
+  if (!osc) return;
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(0.2, start + 0.01);
+  
+  const sustainStart = start + 0.01;
+  const sustainEnd = start + dur - 0.05;
+  
+  if (sustainEnd > sustainStart) {
+    gain.gain.setValueAtTime(0.2, sustainStart);
+    gain.gain.linearRampToValueAtTime(0.2, sustainEnd);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  } else {
+    gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  }
+  
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.1);
+}
+
+/* -------------------------------------------------
+   AUDIO RENDERING (Chunked & Full)
+   ------------------------------------------------- */
+
+function findLastStep() {
+  // Use the actual array length, not the STEPS variable, 
+  // in case of slight desync or pending updates.
+  const limit = notes.length;
+  
+  // Iterate backwards from the end of the array
+  for (let step = limit - 1; step >= 0; step--) {
+    // Check if the step exists and has data
+    if (notes[step] && notes[step].some(val => val > 0)) {
+      return step;
+    }
+  }
+  return -1; // Grid is empty
+}
+
+// Used for Playback (streaming chunks)
+async function renderChunk(startBeat, numBeats) {
+  const startStep = startBeat * SUBDIV;
+  const endBeat = startBeat + numBeats;
+  const endStep = Math.min(endBeat * SUBDIV, notes.length);
+  
+  const duration = ((endStep - startStep) / SUBDIV) * (60 / TEMPO);
+  if (duration <= 0) return null;
+
+  const sampleRate = 44100;
+  const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+
+  // Handle "Held" notes from the *previous* chunk
+  if (startStep > 0) {
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const prevMask = notes[startStep - 1][pitch];
+      if (!prevMask) continue;
+
+      for (let i = 0; i < 4; i++) {
+        const bit = 1 << i;
+        if ((prevMask & bit) && instrumentSettings[i].hold) {
+          const currMask = notes[startStep][pitch];
+          if (currMask & bit) {
+            let length = 0;
+            for (let k = startStep; k < endStep; k++) {
+              if (notes[k][pitch] & bit) length++;
+              else break;
+            }
+            if (length > 0) {
+              scheduleNote(offlineCtx, 0, length * stepSec, pitch, i);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Process notes within this chunk
+  for (let step = startStep; step < endStep; step++) {
+    const stepStart = (step - startStep) * stepSec;
+    
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const currentMask = notes[step][pitch];
+      if (!currentMask) continue;
+      
+      const prevMask = (step > 0) ? notes[step - 1][pitch] : 0;
+
+      for (let i = 0; i < 4; i++) {
+        const bit = 1 << i;
+        if (currentMask & bit) {
+          if (instrumentSettings[i].hold && (prevMask & bit)) {
+            continue; 
+          }
+
+          let noteDuration = stepSec * 0.9; 
+          if (instrumentSettings[i].hold) {
+            let length = 1;
+            for (let k = step + 1; k < endStep; k++) {
+              if (notes[k][pitch] & bit) length++;
+              else break;
+            }
+            noteDuration = length * stepSec;
+          }
+          
+          scheduleNote(offlineCtx, stepStart, noteDuration, pitch, i);
+        }
+      }
+    }
+  }
+
+  return await offlineCtx.startRendering();
+}
+
+// Used for Export (render entire song at once)
+async function renderSong() {
+  const lastStep = findLastStep();
+  if (lastStep === -1) return null;
+  
+  const totalSteps = lastStep + 1;
+  const duration = totalSteps * stepSec + 0.1; 
+  const sampleRate = 44100;
+  const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+  
+  for (let step = 0; step < totalSteps; step++) {
+    const stepStart = step * stepSec;
+    for (let pitch = 0; pitch < PITCHES.length; pitch++) {
+      const currentMask = notes[step][pitch];
+      if (!currentMask) continue;
+      const prevMask = (step > 0) ? notes[step - 1][pitch] : 0;
+      for (let i = 0; i < 4; i++) {
+        const bit = 1 << i;
+        if (currentMask & bit) {
+          if (instrumentSettings[i].hold) {
+            if (prevMask & bit) continue;
+            let length = 1;
+            for (let k = step + 1; k < totalSteps; k++) {
+              if (notes[k][pitch] & bit) length++; else break;
+            }
+            scheduleNote(offlineCtx, stepStart, length * stepSec, pitch, i);
+          } else {
+            scheduleNote(offlineCtx, stepStart, stepSec * 0.9, pitch, i);
+          }
+        }
+      }
+    }
+  }
+  return await offlineCtx.startRendering();
+}
+
+/* -------------------------------------------------
+   EXPORT
+   ------------------------------------------------- */
+
+async function exportWav() {
+  stopPlayback();
+  
+  // Call the renderSong function defined above
+  const buffer = await renderSong();
+  
+  if (!buffer) { alert("No notes to export!"); return; }
+  
+  const wavBlob = bufferToWave(buffer);
+  const url = URL.createObjectURL(wavBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rollidy_${new Date().toISOString().slice(0,19)}.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function bufferToWave(abuffer) {
+  const numOfChan = abuffer.numberOfChannels;
+  const length = abuffer.length * numOfChan * 2 + 44;
+  const buffer = new ArrayBuffer(length);
+  const view = new DataView(buffer);
+  const channels = [];
+  let sample; let pos = 0; let offset = 0;
+  const setUint16 = (data) => { view.setUint16(pos, data, true); pos += 2; };
+  const setUint32 = (data) => { view.setUint32(pos, data, true); pos += 4; };
+  setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
+  setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
+  setUint32(abuffer.sampleRate); setUint32(abuffer.sampleRate * 2 * numOfChan);
+  setUint16(numOfChan * 2); setUint16(16);
+  setUint32(0x61746164); setUint32(length - pos - 4);
+  for (let i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+  while (pos < length) {
+    for (let i = 0; i < numOfChan; i++) {
+      sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+      view.setInt16(pos, sample, true); pos += 2;
+    }
+    offset++;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+/* -------------------------------------------------
+   DYNAMIC AUDIO REFRESH
+   ------------------------------------------------- */
+let renderId = 0;
+
+async function refreshLiveAudio() {
+  if (!isPlaying || !audioCtx) return;
+
+  // When editing, we simply re-render the CURRENT chunk and swap it immediately.
+  // We maintain the current chunkStartTime to keep position.
+  
+  const buffer = await renderChunk(currentChunkIndex * CHUNK_BEATS, CHUNK_BEATS);
+  
+  if (!isPlaying || !buffer) return;
+
+  // Stop current source
+  if (currentChunkSource) {
+    try { currentChunkSource.stop(); } catch(e) {}
+  }
+
+  // Start new source at the SAME absolute time (chunkStartTime) so it stays in sync
+  currentChunkSource = audioCtx.createBufferSource();
+  currentChunkSource.buffer = buffer;
+  currentChunkSource.connect(audioCtx.destination);
+  
+  // We need to start it at the correct offset relative to now
+  const elapsed = audioCtx.currentTime - chunkStartTime;
+  // Because we are swapping instantly, we just restart the chunk from the beginning?
+  // Better: We maintain the timeline. The buffer is the same length.
+  // We start it at the original chunkStartTime. The AudioContext timeline handles the overlap.
+  
+  currentChunkSource.start(chunkStartTime); 
+
+  // We also need to invalidate the pre-rendered next chunk so it regenerates with new notes
+  nextChunkBuffer = null;
+  prepareNextChunk(currentChunkIndex + 1);
+}
+
+/* -------------------------------------------------
+   PLAYBACK
+   ------------------------------------------------- */
+let playAnim = null;
+let playStartTime = 0;
+let currentBufferDuration = 0;
+
+async function startPlayback() {
+  if (isPlaying) stopPlayback();
+
+  const requestId = ++playRequestId;
+
+  if (!audioCtx || audioCtx.state === 'closed') audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  
+  isPlaying = true;
+
+  // --- UPDATE BUTTON STATE ---
+  const btn = document.getElementById('playBtn');
+  btn.textContent = "⏹ Stop";
+  btn.style.backgroundColor = "yellow";
+  btn.style.color = "black";
+
+  // 1. Determine starting position based on scroll
+  const scrollPixels = container.scrollLeft;
+  const startStep = Math.floor(scrollPixels / CELL_W);
+  const startBeat = Math.floor(startStep / SUBDIV);
+  
+  // --- FIX: FORCE EXPANSION BEFORE PLAY ---
+  // Ensure the grid array is large enough for the current view + buffer
+  const visibleSteps = Math.ceil(container.clientWidth / CELL_W);
+  const requiredSteps = startStep + visibleSteps + (SUBDIV * 64);
+  
+  if (requiredSteps > STEPS) {
+      expandGridToSteps(requiredSteps);
+  }
+  // ----------------------------------------
+
+  // 2. Calculate Chunk Context
+  currentChunkIndex = Math.floor(startBeat / CHUNK_BEATS);
+  const chunkStartBeat = currentChunkIndex * CHUNK_BEATS;
+  
+  // 3. FIX: Calculate offset RELATIVE to the current chunk, not global time
+  const offsetBeats = startBeat - chunkStartBeat;
+  const offsetTime = offsetBeats * (60 / TEMPO); // Convert beats to seconds
+
+  // 4. Sync Audio Clock
+  // We set chunkStartTime so that "now" corresponds to "offsetTime" within the chunk.
+  // Formula: chunkStartTime = now - elapsed_time_within_chunk
+  chunkStartTime = audioCtx.currentTime - offsetTime;
+
+  // 5. Render and Play First Chunk using the LOCAL offset
+  await loadAndPlayChunk(currentChunkIndex, offsetTime);
+
+  // 6. Start the Visual Loop
+  drawPlayHead();
+}
+
+// Helper: Loads a specific chunk and plays it immediately
+// ADDED: startTimeOffset parameter (defaults to 0 for seamless chaining)
+async function loadAndPlayChunk(chunkIndex, startTimeOffset = 0) {
+  let buffer = await renderChunk(chunkIndex * CHUNK_BEATS, CHUNK_BEATS);
+  
+  if (!isPlaying || !audioCtx) return;
+
+  // --- FIX: Create a silent buffer if the chunk is empty ---
+  if (!buffer) {
+    // Create a chunk-length silent buffer so the clock keeps ticking
+    const sampleRate = audioCtx.sampleRate;
+    // FIX: Used TEMPO instead of undefined BPM variable
+    const frameCount = sampleRate * (CHUNK_BEATS * (60 / TEMPO)); 
+    buffer = audioCtx.createBuffer(1, frameCount, sampleRate);
+  }
+  // ---------------------------------------------------------
+
+  if (currentChunkSource) {
+    try { currentChunkSource.stop(); } catch(e) {}
+  }
+
+  currentChunkSource = audioCtx.createBufferSource();
+  currentChunkSource.buffer = buffer;
+  currentChunkSource.connect(audioCtx.destination);
+  
+  // Ensure we don't try to schedule in the past
+  let when = Math.max(chunkStartTime, audioCtx.currentTime);
+  
+  currentChunkSource.start(when, startTimeOffset);
+  
+  // Schedule the next chunk
+  prepareNextChunk(chunkIndex + 1);
+}
+
+function drawPlayHead() {
+  if (!isPlaying || !audioCtx) return;
+
+  const elapsed = audioCtx.currentTime - chunkStartTime;
+  const isLooping = document.getElementById('loop').checked;
+
+  const lastStep = findLastStep();
+  if (lastStep === -1) { stopPlayback(); return; }
+
+  const totalBeats = (lastStep + 1) / SUBDIV;
+  const totalDuration = totalBeats * (60 / TEMPO);
+  
+  const currentBeatStart = currentChunkIndex * CHUNK_BEATS;
+  const beatInChunk = elapsed / (60 / TEMPO);
+  const globalBeat = currentBeatStart + beatInChunk;
+
+  if (globalBeat >= totalBeats) {
+    if (isLooping) {
+      const overshootBeats = globalBeat - totalBeats;
+      const overshootTime = overshootBeats * (60 / TEMPO);
+      chunkStartTime = audioCtx.currentTime - overshootTime;
+      currentChunkIndex = 0;
+      loadAndPlayChunk(0, overshootTime);
+      prepareNextChunk(1);
+    } else {
+      stopPlayback();
+      return;
+    }
+  }
+
+  const bufferDuration = currentChunkSource ? currentChunkSource.buffer.duration : 0;
+  const timeLeft = bufferDuration - elapsed;
+
+  if (timeLeft < SCHEDULE_AHEAD_TIME && !isPreparingNextChunk) {
+    const nextIdx = currentChunkIndex + 1;
+    chunkStartTime += bufferDuration; 
+    currentChunkIndex = nextIdx;
+    
+    if (nextChunkBuffer) {
+      playPreparedNextChunk();
+      prepareNextChunk(currentChunkIndex + 1);
+    } else {
+      loadAndPlayChunk(currentChunkIndex);
+    }
+  }
+
+  // --- Visual Logic with Virtual Scroll ---
+  const visualTime = isLooping 
+    ? (globalBeat % totalBeats) * (60/TEMPO) 
+    : Math.min(globalBeat * (60/TEMPO), totalDuration);
+    
+  const absoluteX = (visualTime / stepSec) * CELL_W;
+  const scrollLeft = container.scrollLeft;
+  const viewWidth = canvas.width;
+
+  // Auto-Scroll (Only if playhead goes off screen)
+  const margin = viewWidth / 4;
+  if (absoluteX < scrollLeft || absoluteX > scrollLeft + viewWidth - margin) {
+     container.scrollLeft = absoluteX - margin;
+  }
+  
+  redrawAll();
+
+  // Draw Playhead (Screen Coordinates)
+  const screenX = absoluteX - scrollLeft;
+  ctx.fillStyle = '#ff5722';
+  ctx.fillRect(screenX, 0, 2, canvas.height);
+
+  playAnim = requestAnimationFrame(drawPlayHead);
+}
+
+// --- Helpers for Chunking ---
+
+async function prepareNextChunk(nextIndex) {
+  isPreparingNextChunk = true;
+  // Check bounds based on actual notes
+  const lastStep = findLastStep();
+  const totalBeats = (lastStep + 1) / SUBDIV;
+  
+  // If next chunk is well beyond the last note, we don't need to prepare it 
+  // (unless we are looping, but loadAndPlayChunk handles loop wrap-around)
+  if (!document.getElementById('loop').checked && (nextIndex * CHUNK_BEATS) >= totalBeats) {
+    nextChunkBuffer = null; 
+    isPreparingNextChunk = false;
+    return;
+  }
+
+  nextChunkBuffer = await renderChunk(nextIndex * CHUNK_BEATS, CHUNK_BEATS);
+  isPreparingNextChunk = false;
+}
+
+function playPreparedNextChunk() {
+  if (!nextChunkBuffer) return;
+
+  if (currentChunkSource) {
+    try { currentChunkSource.stop(); } catch(e) {}
+  }
+
+  currentChunkSource = audioCtx.createBufferSource();
+  currentChunkSource.buffer = nextChunkBuffer;
+  currentChunkSource.connect(audioCtx.destination);
+  currentChunkSource.start(chunkStartTime); // Start exactly when previous ends
+
+  nextChunkBuffer = null; // Clear cache
+}
+
+function stopPlayback() {
+  playRequestId++;
+
+  if (playAnim) cancelAnimationFrame(playAnim);
+  playAnim = null;
+  
+  isPlaying = false;
+  
+  // Reset Chunk State
+  currentChunkIndex = -1;
+  chunkStartTime = 0;
+  nextChunkBuffer = null;
+  isPreparingNextChunk = false;
+  
+  // Stop Audio
+  if (currentChunkSource) {
+    try {
+      currentChunkSource.onended = null;
+      currentChunkSource.stop();
+      currentChunkSource.disconnect();
+    } catch(e) { }
+    currentChunkSource = null;
+  }
+  
+  // SILENCE ALL STYLE OSCILLATORS
+  Object.keys(STYLE).forEach(key => {
+    const style = getStyle(key);
+    if (style) style.silence();
+  });
+
+  // --- UPDATE BUTTON STATE ---
+  const btn = document.getElementById('playBtn');
+  btn.textContent = "▶ Play";
+  btn.style.backgroundColor = "green";
+  btn.style.color = "white";
+  
+  redrawAll();
+}
+
+/* -------------------------------------------------
+   EXPORT & CLEAR
+   ------------------------------------------------- */
+function exportJson() {
+  const list = generateMelodyList();
+  const data = { 
+    name: "Rolldiy Composition",
+    date: new Date().toISOString(),
+    bpm: TEMPO,
+    subdivision: SUBDIV,
+    notes: list 
+  };
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rollidy_${new Date().toISOString().slice(0,19)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function exportWav() {
+  stopPlayback();
+  const buffer = await renderSong();
+  if (!buffer) { alert("No notes to export!"); return; }
+  const wavBlob = bufferToWave(buffer);
+  const url = URL.createObjectURL(wavBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rollidy_${new Date().toISOString().slice(0,19)}.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function bufferToWave(abuffer) {
+  const numOfChan = abuffer.numberOfChannels;
+  const length = abuffer.length * numOfChan * 2 + 44;
+  const buffer = new ArrayBuffer(length);
+  const view = new DataView(buffer);
+  const channels = [];
+  let sample; let pos = 0; let offset = 0;
+  const setUint16 = (data) => { view.setUint16(pos, data, true); pos += 2; };
+  const setUint32 = (data) => { view.setUint32(pos, data, true); pos += 4; };
+  setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
+  setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
+  setUint32(abuffer.sampleRate); setUint32(abuffer.sampleRate * 2 * numOfChan);
+  setUint16(numOfChan * 2); setUint16(16);
+  setUint32(0x61746164); setUint32(length - pos - 4);
+  for (let i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+  while (pos < length) {
+    for (let i = 0; i < numOfChan; i++) {
+      sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+      view.setInt16(pos, sample, true); pos += 2;
+    }
+    offset++;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function clearGrid() {
+  if(confirm("Clear the current Melody?")) {
+    stopPlayback();
+    for (let step = 0; step < STEPS; step++) notes[step].fill(0);
+    
+    selectedCorners = []; // Deselect all notes
+    redrawAll(); // Redraw everything
+  }
+}
+
+/* -------------------------------------------------
+   PROCEDURAL GENERATION
+   ------------------------------------------------- */
+const SCALES = {
+  'major': [0, 2, 4, 5, 7, 9, 11],
+  'minor': [0, 2, 3, 5, 7, 8, 10],
+  'pentMinor': [0, 3, 5, 7, 10],
+  'blues': [0, 3, 5, 6, 7, 10],
+  'chromatic': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+};
+
+window.generateMelody = function(instIdx, density, root, scaleName, octaveRange, clearExisting = true) {
+  const intervals = SCALES[scaleName];
+  if (!intervals) return;
+
+  // 1. Strict Octave Filtering
+  const [minOct, maxOct] = octaveRange.split('-').map(Number);
+  const validPitches = [];
+  
+  // Ensure we stay strictly within the PITCHES array bounds and the octave range
+  for (let o = minOct; o <= maxOct; o++) {
+    intervals.forEach(interval => {
+      const pitchIdx = (o * 12) + ((root + interval) % 12);
+      if (pitchIdx >= 0 && pitchIdx < PITCHES.length) {
+        validPitches.push(pitchIdx);
+      }
+    });
+  }
+
+  if (validPitches.length === 0) return;
+  pushUndo();
+
+  // 2. Clear Existing (if requested)
+  if (clearExisting) {
+    const instBit = 1 << instIdx;
+    for (let s = 0; s < STEPS; s++) {
+      for (let p = 0; p < PITCHES.length; p++) {
+        notes[s][p] &= ~(instBit);
+      }
+    }
+  }
+
+  // 3. Generation Logic
+  let lastPitch = validPitches[Math.floor(Math.random() * validPitches.length)];
+
+  for (let s = 0; s < STEPS; s++) {
+    const shouldPlay = Math.random() < density;
+
+    if (shouldPlay) {
+      // Find melodic neighbors within the valid range to prevent wild jumps
+      // This creates "Good Music" by following stepwise motion
+      const neighbors = validPitches.filter(p => Math.abs(p - lastPitch) <= 7);
+      const pool = neighbors.length > 0 ? neighbors : validPitches;
+      
+      lastPitch = pool[Math.floor(Math.random() * pool.length)];
+      notes[s][lastPitch] |= (1 << instIdx);
+    } else {
+      // REPEAT LIMITATION: 
+      // Instead of adding new notes or leaving silence, 
+      // we play the last chosen pitch again to "sustain" the sound rhythmically.
+      notes[s][lastPitch] |= (1 << instIdx);
+    }
+  }
+
+  redrawAll();
+};
+
+// --- UI Event Bindings ---
+
+const genModal = document.getElementById('generateModal');
+const genCloseBtn = genModal.querySelector('.close');
+const genDensityInput = document.getElementById('genDensity');
+const genDensityVal = document.getElementById('genDensityVal');
+const doGenerateBtn = document.getElementById('doGenerateBtn');
+
+document.getElementById('generateBtn').addEventListener('click', () => {
+  genModal.style.display = 'block';
+});
+
+genCloseBtn.onclick = () => genModal.style.display = 'none';
+
+window.addEventListener('click', (e) => {
+  if (e.target == genModal) genModal.style.display = 'none';
+});
+
+genDensityInput.addEventListener('input', (e) => {
+  genDensityVal.textContent = e.target.value + '%';
+});
+
+doGenerateBtn.addEventListener('click', () => {
+  const instIdx = parseInt(document.getElementById('genInstrument').value);
+  const density = parseInt(genDensityInput.value) / 100;
+  const root = parseInt(document.getElementById('genKey').value);
+  const scaleName = document.getElementById('genScale').value;
+  
+  // FIX: Read min and max values separately
+  const minOct = document.getElementById('genOctaveMin').value;
+  const maxOct = document.getElementById('genOctaveMax').value;
+  
+  // Construct the range string expected by the generator (e.g., "3-5")
+  const octaveRange = `${minOct}-${maxOct}`;
+
+  window.generateMelody(instIdx, density, root, scaleName, octaveRange);
+  
+  genModal.style.display = 'none';
+});
+
+function showHelp() {
+  // Create modal container
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.style.display = 'block';
+  
+  // Close when clicking outside the content
+  modal.onclick = (e) => { 
+    if(e.target === modal) document.body.removeChild(modal); 
+  };
+
+  // Modal content
+  const content = document.createElement('div');
+  content.className = 'modal-content';
+  content.style.width = '500px';
+  content.style.maxWidth = '90%';
+  
+  const helpHTML = `
+    <div class="modal-header">
+      <h2>Help & Shortcuts</h2>
+      <span class="close" id="dynamicHelpClose">&times;</span>
+    </div>
+    <div style="line-height: 1.6; font-size: 13px; max-height: 400px; overflow-y: auto; padding: 20px; padding-top: 0;">
+      <h3>Playback</h3>
+      <ul>
+        <li><b>Space</b> - Play from current position / Stop</li>
+        <li><b>Long Press Play</b> - Open Melody Table</li>
+      </ul>
+      
+      <h3>Editing Notes</h3>
+      <ul>
+        <li><b>Left Click</b> - Place / Toggle Note</li>
+        <li><b>Left Click + Drag</b> - Draw Notes (Paint Mode)</li>
+        <li><b>Right Click + Drag</b> - Pan View (Scroll)</li>
+        <li><b>Delete / Backspace</b> - Delete Selected Notes</li>
+      </ul>
+
+      <h3>Selection Tools</h3>
+      <ul>
+        <li><b>Ctrl + Left Click</b> - Select / Add to Selection</li>
+        <li><b>Shift + Ctrl + Click</b> - Remove from Selection</li>
+        <li><b>Ctrl + Drag (Empty)</b> - Box Select</li>
+        <li><b>Ctrl + Drag (Note)</b> - Move Selection</li>
+        <li><b>Ctrl + Arrows</b> - Move Selection (Nudge)</li>
+        <li><b>A</b> - Select All Notes</li>
+      </ul>
+      
+      <h3>Transform</h3>
+      <ul>
+        <li><b>H</b> - Flip Selection Horizontally</li>
+        <li><b>V</b> - Flip Selection Vertically</li>
+      </ul>
+
+      <h3>Clipboard & History</h3>
+      <ul>
+        <li><b>Ctrl + C</b> - Copy Selection</li>
+        <li><b>Ctrl + V</b> - Paste Selection</li>
+        <li><b>X</b> / <b>Ctrl + X</b> - Cut Selection</li>
+        <li><b>Z</b> / <b>Ctrl + Z</b> - Undo</li>
+        <li><b>Y</b> / <b>Ctrl + Y</b> - Redo</li>
+      </ul>
+      
+      <h3>Navigation</h3>
+      <ul>
+        <li><b>Arrow Keys</b> - Pan View</li>
+        <li><b>Virtual Canvas</b> - The grid is a window. Scroll/Pan to navigate the full song length.</li>
+        <li><b>Auto-Expand</b> - Clicking or Pasting past the end automatically extends the song.</li>
+      </ul>
+    </div>
+  `;
+
+  content.innerHTML = helpHTML;
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+
+  // Attach event listener to the new close button
+  const closeBtn = document.getElementById('dynamicHelpClose');
+  if (closeBtn) {
+    closeBtn.onclick = () => document.body.removeChild(modal);
+  }
+}
+
+/* -------------------------------------------------
+   INIT
+   ------------------------------------------------- */
+populateWaveTypeSelector();
+
+// Initial Grid Setup
+updateSongLength(); // Set the initial spacer width
+resizeCanvas();     // Size the canvas to the viewport
+
+// Scroll to C4
+const c4Index = PITCHES.indexOf('C4');
+if (c4Index !== -1) {
+    setTimeout(() => {
+        const viewHeight = container.clientHeight;
+        const targetScroll = (c4Index * CELL_H) - viewHeight + CELL_H;
+        const maxScroll = canvas.height - viewHeight;
+        container.scrollTop = Math.max(0, Math.min(targetScroll, maxScroll));
+        labelsCol.scrollTop = container.scrollTop;
+    }, 100);
+}
+
+redrawAll();
+</script>
+</body>
+</html>
