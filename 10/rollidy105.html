@@ -1,5 +1,7 @@
 <!--
-    Get rid of percussion, the variable, if I check Hold it groups equal pitched notes together. percussion is an unnecessary override.
+    Improve this code to be more reliable.
+    
+    if I add notes to the right edge it should grow the melody
     
     Remember that it is Virtual, the canvas never grows it's a window of the full melody.
     
@@ -9,7 +11,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Rollidy 10.4</title>
+<title>Rollidy 10.5</title>
 <style>
   .label-row:nth-child(even) {
     background: var(--pair-row-bg);
@@ -4446,34 +4448,59 @@ const gridSpacer = document.getElementById('gridSpacer');
 const verticalSpacer = document.getElementById('verticalSpacer');
 
 function resizeCanvas() {
-  // Set canvas size to match the visible viewport exactly
+  // 1. Canvas size matches the VIEWPORT (Window), never the song length.
+  // This is the key to reliability - the canvas is just a lens.
   const rect = container.getBoundingClientRect();
   canvas.width = rect.width;
   canvas.height = rect.height;
   
-  // Redraw after resize
+  // 2. Redraw the visible portion immediately after resize
   redrawAll();
 }
 
-// Update the "Virtual" size of the song (the scrollbar area)
 function updateSongLength() {
-  // 1. Horizontal Length (Time)
+  // 1. Calculate required width based on data
+  // We add a buffer so the user can scroll past the last note to compose
   const bufferBeats = 100;
   const minSteps = (BEATS + bufferBeats) * SUBDIV;
+  
+  // Use the actual length of the notes array to determine current size
   const steps = Math.max(notes.length, minSteps);
   const totalWidth = steps * CELL_W;
+  
+  // 2. Update Horizontal Spacer (Triggers Scrollbar)
   gridSpacer.style.width = totalWidth + 'px';
   
-  // 2. Vertical Length (Pitches)
-  // We force the height to accommodate all pitches so we can scroll down
+  // 3. Update Vertical Spacer (For vertical scrolling)
+  // Forces the height to accommodate all pitches
   const totalHeight = PITCHES.length * CELL_H;
   verticalSpacer.style.height = totalHeight + 'px';
   
-  // Ensure our notes array covers this new length
+  // 4. Ensure the Data Array matches this new length
+  // This expands the array but never shrinks it (data safety)
   expandGridToSteps(steps);
 }
 
-// Initial setup
+function expandGridToSteps(newTotalSteps) {
+  const oldSteps = notes.length;
+
+  // Only expand if needed
+  if (newTotalSteps > oldSteps) {
+    // Update Global Counters
+    BEATS = Math.ceil(newTotalSteps / SUBDIV);
+    STEPS = BEATS * SUBDIV;
+
+    // Push new empty rows into the data array
+    for (let i = oldSteps; i < STEPS; i++) {
+      notes.push(new Uint8Array(PITCHES.length));
+    }
+    
+    // IMPORTANT: Update scroll spacer immediately to reflect new size
+    gridSpacer.style.width = (STEPS * CELL_W) + 'px';
+  }
+}
+
+// Global Resize Listener
 window.addEventListener('resize', resizeCanvas);
 
 /* -------------------------------------------------
@@ -5361,26 +5388,27 @@ function handlePaste() {
   const anchorPitch = (hoverPitch >= 0) ? hoverPitch : 0;
   
   let maxStepNeeded = 0;
-  const newSelection = [];
   
-  // CHANGE: Calculate max step needed first
+  // Calculate the furthest step needed for this paste operation
   clipboard.forEach(c => {
     const targetStep = anchorStep + c.dStep;
     if(targetStep > maxStepNeeded) maxStepNeeded = targetStep;
   });
 
-  // CHANGE: Expand grid if pasting past the end
-  if (maxStepNeeded >= STEPS) {
+  // RELIABILITY FIX: Grow the grid if pasting past the end
+  if (maxStepNeeded >= notes.length) {
      expandGridToSteps(maxStepNeeded + (SUBDIV * 4));
-     updateSongLength(); // UPDATE: Grow the virtual scrollbar
+     updateSongLength(); 
   }
+  
+  const newSelection = [];
   
   clipboard.forEach(c => {
     const targetStep = anchorStep + c.dStep;
     const targetPitch = anchorPitch + c.dPitch;
     
-    // Check boundaries (now safe for horizontal)
-    if (targetStep >= 0 && targetStep < STEPS && targetPitch >= 0 && targetPitch < PITCHES.length) {
+    // Check boundaries (safe now that grid is expanded)
+    if (targetStep >= 0 && targetStep < notes.length && targetPitch >= 0 && targetPitch < PITCHES.length) {
       const bit = 1 << c.instIdx;
       
       notes[targetStep][targetPitch] |= bit;
@@ -5450,27 +5478,35 @@ function drawGrid(startStep, endStep, scrollLeft, startPitch, endPitch, scrollTo
   }
 }
 
+/* -------------------------------------------------
+   DRAWING (VIRTUALIZED)
+   ------------------------------------------------- */
+
 function redrawAll() {
   if (!ctx) return;
   clearCanvas();
   
-  // Calculate visible range (Horizontal)
+  // 1. Get Scroll State
   const scrollLeft = container.scrollLeft;
-  const viewWidth = canvas.width; 
+  const scrollTop = container.scrollTop;
+  
+  // 2. Calculate Visible Indices (Virtualization)
+  // We only render what is visible on screen + a small buffer
+  const viewWidth = canvas.width;
+  const viewHeight = canvas.height;
+  
   const startStep = Math.floor(scrollLeft / CELL_W);
   const endStep = Math.ceil((scrollLeft + viewWidth) / CELL_W);
   
-  // Calculate visible range (Vertical)
-  const scrollTop = container.scrollTop;
-  const viewHeight = canvas.height;
   const startPitch = Math.floor(scrollTop / CELL_H);
   const endPitch = Math.ceil((scrollTop + viewHeight) / CELL_H);
   
+  // 3. Render Layers (Order matters)
   drawGrid(startStep, endStep, scrollLeft, startPitch, endPitch, scrollTop);
   drawNotes(startStep, endStep, scrollLeft, startPitch, endPitch, scrollTop);
   drawHighlight(scrollLeft, scrollTop);
   
-  // FIX: Pass scrollTop to selection functions
+  // 4. Render UI Overlays (Selection/Drag)
   if (isSelecting) drawSelectionBox(scrollLeft, scrollTop);
   if (selectedCorners.length > 0 && !isDraggingSelection) drawSelectionBorders(scrollLeft, scrollTop);
   if (isDraggingSelection) drawDraggedNotes(scrollLeft, scrollTop);
@@ -5708,20 +5744,20 @@ function getWaveColor(i) {
 function toggleNoteAt(mouseX, mouseY, scrollLeft, scrollTop, isCtrlClick = false) {
   // Convert screen mouse X/Y to absolute grid step/pitch
   let step = Math.floor((mouseX + scrollLeft) / CELL_W);
-  // FIX: Add scrollTop to calculation
   const pitch = Math.floor((mouseY + scrollTop) / CELL_H); 
 
-  // Auto-Expand if clicking in empty space at the end
+  // RELIABILITY FIX: Check if we are clicking at or past the edge
   if (step >= notes.length) {
+     // Expand the grid to fit the new note + a buffer for scrolling
      expandGridToSteps(step + (SUBDIV * 4));
-     updateSongLength(); // UPDATE: Grow the virtual scrollbar immediately
+     // Force the scrollbar to update so the user sees the growth
+     updateSongLength(); 
   }
 
   if (step < 0 || step >= notes.length || pitch < 0 || pitch >= PITCHES.length) return;
   
   pushUndo(); 
   
-  // FIX: Add scrollTop to relative calculation
   const relX = (mouseX + scrollLeft) - (step * CELL_W); 
   const relY = (mouseY + scrollTop) - (pitch * CELL_H);
   
@@ -5789,50 +5825,52 @@ function moveSelection(dStep, dPitch) {
 
   // 1. Calculate new positions and validate bounds
   let maxStepNeeded = 0;
-  const newCorners = [];
   
   for (let c of selectedCorners) {
     const newStep = c.step + dStep;
-    const newPitch = c.pitch + dPitch;
-    
-    // Track the furthest step needed
     if (newStep > maxStepNeeded) maxStepNeeded = newStep;
-
-    // Check vertical boundaries (pitches cannot be auto-expanded)
-    if (newPitch < 0 || newPitch >= PITCHES.length) {
-      return; // Stop if any note goes out of vertical bounds
-    }
-    
-    newCorners.push({
-      step: newStep,
-      pitch: newPitch,
-      instIdx: c.instIdx
-    });
   }
 
-  // CHANGE: Expand grid if we dragged past the end
-  if (maxStepNeeded >= STEPS) {
+  // RELIABILITY FIX: Expand grid if we dragged past the end
+  if (maxStepNeeded >= notes.length) {
      expandGridToSteps(maxStepNeeded + (SUBDIV * 4));
-     updateSongLength(); // UPDATE: Grow the virtual scrollbar
+     updateSongLength();
   }
 
   // Re-check boundaries now that grid is potentially expanded
-  for(let c of newCorners) {
-      if(c.step < 0) return; 
+  // (We allow movement if steps are valid, otherwise we cancel the move)
+  for (let c of selectedCorners) {
+      const newStep = c.step + dStep;
+      const newPitch = c.pitch + dPitch;
+      if (newStep < 0 || newPitch < 0 || newPitch >= PITCHES.length) {
+          return; // Stop if out of bounds (vertically or start of song)
+      }
   }
 
   // 2. Save state for Undo
   pushUndo();
 
   // 3. Apply changes
+  // Clear old positions
   selectedCorners.forEach(c => {
     const bit = 1 << c.instIdx;
     notes[c.step][c.pitch] &= ~bit;
   });
 
-  newCorners.forEach(c => {
+  // Set new positions
+  const newCorners = [];
+  selectedCorners.forEach(c => {
+    const newStep = c.step + dStep;
+    const newPitch = c.pitch + dPitch;
+
     const bit = 1 << c.instIdx;
-    notes[c.step][c.pitch] |= bit;
+    notes[newStep][newPitch] |= bit;
+    
+    newCorners.push({
+      step: newStep,
+      pitch: newPitch,
+      instIdx: c.instIdx
+    });
   });
 
   // 4. Update selection state
@@ -7416,23 +7454,28 @@ function showHelp() {
    ------------------------------------------------- */
 populateWaveTypeSelector();
 
-// Initial Grid Setup
-updateSongLength(); // Set the initial spacer width
-resizeCanvas();     // Size the canvas to the viewport
+// 1. Set Initial Song Length (Creates spacers)
+updateSongLength();
 
-// Scroll to C4
+// 2. Size the Canvas to the Viewport
+resizeCanvas();
+
+// 3. Scroll to Middle C (C4) for a good starting view
 const c4Index = PITCHES.indexOf('C4');
 if (c4Index !== -1) {
     setTimeout(() => {
         const viewHeight = container.clientHeight;
-        const targetScroll = (c4Index * CELL_H) - viewHeight + CELL_H;
-        const maxScroll = canvas.height - viewHeight;
-        container.scrollTop = Math.max(0, Math.min(targetScroll, maxScroll));
-        labelsCol.scrollTop = container.scrollTop;
+        // Position C4 roughly in the middle or lower third of the screen
+        const targetScroll = (c4Index * CELL_H) - (viewHeight / 2);
+        container.scrollTop = Math.max(0, targetScroll);
+        labelsCol.scrollTop = container.scrollTop; // Sync sidebar
+        
+        // 4. Initial Draw (after scroll setup)
+        redrawAll();
     }, 100);
+} else {
+    redrawAll();
 }
-
-redrawAll();
 </script>
 </body>
 </html>
