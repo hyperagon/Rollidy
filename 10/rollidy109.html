@@ -1,5 +1,5 @@
 <!--
-    The melody ends when the last note finishes playing, right now it's cutting it short and not taking into account the corner's decay.
+    Looping skips the initial notes, this is happening now that the audio plays until all note delays finish.
     
     Remember that it is Virtual, the canvas never grows it's a window of the full melody.
     
@@ -9,7 +9,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Rollidy 10.8</title>
+<title>Rollidy 10.9</title>
 <style>
   .label-row:nth-child(even) {
     background: var(--pair-row-bg);
@@ -7045,7 +7045,7 @@ function bufferToWave(abuffer) {
 }
 
 /* -------------------------------------------------
-   PLAYBACK
+   PLAYBACK (FIXED LOOPING)
    ------------------------------------------------- */
 let playAnim = null;
 let playStartTime = 0;
@@ -7102,7 +7102,39 @@ async function startPlayback() {
 
 // Helper: Loads a specific chunk and plays it immediately
 async function loadAndPlayChunk(chunkIndex, startTimeOffset = 0) {
-  const tail = calculateChunkTail(chunkIndex);
+  const isLooping = document.getElementById('loop').checked;
+  const lastStep = findLastStep();
+  const noteEndBeats = lastStep >= 0 ? ((lastStep + 1) / SUBDIV) : 0;
+  const chunkStartBeats = chunkIndex * CHUNK_BEATS;
+  
+  // When looping, don't render chunks that start after the loop point
+  if (isLooping && chunkStartBeats >= noteEndBeats) {
+    // Create a minimal silent buffer just to keep the timing system working
+    const sampleRate = audioCtx.sampleRate;
+    const minDuration = 0.1;
+    const frameCount = Math.max(1, Math.ceil(sampleRate * minDuration));
+    const buffer = audioCtx.createBuffer(1, frameCount, sampleRate);
+    
+    if (currentChunkSource) {
+      try { currentChunkSource.stop(); } catch(e) {}
+    }
+
+    currentChunkSource = audioCtx.createBufferSource();
+    currentChunkSource.buffer = buffer;
+    currentChunkSource.connect(masterGain);
+    
+    let when = startTimeOffset > 0 ? Math.max(chunkStartTime, audioCtx.currentTime) : audioCtx.currentTime;
+    currentChunkSource.start(when, Math.min(startTimeOffset, minDuration));
+    
+    if (startTimeOffset === 0) {
+      chunkStartTime = audioCtx.currentTime;
+    }
+    return;
+  }
+  
+  // For looping: no tail (loop should be tight)
+  // For non-looping: add tail so final notes ring out
+  const tail = isLooping ? 0 : calculateChunkTail(chunkIndex);
   let buffer = await renderChunk(chunkIndex * CHUNK_BEATS, CHUNK_BEATS, tail);
   
   if (!isPlaying || !audioCtx) return;
@@ -7110,7 +7142,7 @@ async function loadAndPlayChunk(chunkIndex, startTimeOffset = 0) {
   if (!buffer) {
     const sampleRate = audioCtx.sampleRate;
     const chunkDuration = CHUNK_BEATS * (60 / TEMPO) + tail;
-    const frameCount = sampleRate * chunkDuration; 
+    const frameCount = Math.max(1, Math.ceil(sampleRate * chunkDuration)); 
     buffer = audioCtx.createBuffer(1, frameCount, sampleRate);
   }
 
@@ -7132,7 +7164,7 @@ async function loadAndPlayChunk(chunkIndex, startTimeOffset = 0) {
   }
 
   prepareNextChunk(chunkIndex + 1);
-}prepareNextChunk
+}
 
 function drawPlayHead() {
   if (!isPlaying || !audioCtx) return;
@@ -7143,7 +7175,11 @@ function drawPlayHead() {
   const lastStep = findLastStep();
   if (lastStep === -1) { stopPlayback(); return; }
 
+  // Two different end points:
+  // - noteEndBeats: Where the last note triggers (used as LOOP POINT)
+  // - trueEndBeats: Where all audio actually ends (used for non-loop stop)
   const noteEndBeats = ((lastStep + 1) / SUBDIV);
+  const noteEndTime = noteEndBeats * (60 / TEMPO);
   const trueEnd = playbackTrueEnd > 0 ? playbackTrueEnd : getTrueEndTime();
   const trueEndBeats = trueEnd / (60 / TEMPO);
   
@@ -7151,16 +7187,24 @@ function drawPlayHead() {
   const beatInChunk = elapsed / (60 / TEMPO);
   const globalBeat = currentBeatStart + beatInChunk;
 
-  if (globalBeat >= trueEndBeats) {
+  // KEY FIX: Use noteEndBeats for loop trigger, trueEndBeats for non-loop stop
+  const triggerBeats = isLooping ? noteEndBeats : trueEndBeats;
+
+  if (globalBeat >= triggerBeats) {
     if (isLooping) {
-      const loopBeats = noteEndBeats;
-      const overshootBeats = globalBeat - loopBeats;
+      // Calculate how far past the loop point we are
+      const overshootBeats = globalBeat - noteEndBeats;
       const overshootTime = overshootBeats * (60 / TEMPO);
+      
+      // Reset chunk tracking to the beginning with the overshoot
       chunkStartTime = audioCtx.currentTime - overshootTime;
       currentChunkIndex = 0;
+      
+      // Start playing from the beginning at the overshoot position
       loadAndPlayChunk(0, overshootTime);
       prepareNextChunk(1);
     } else {
+      // Non-looping: play to true end, draw final position, then stop
       const finalX = trueEnd / stepSec * CELL_W;
       const scrollLeft = container.scrollLeft;
       
@@ -7173,10 +7217,17 @@ function drawPlayHead() {
     }
   }
 
+  // Check if we need to transition to the next chunk
   const bufferDuration = currentChunkSource ? currentChunkSource.buffer.duration : 0;
   const timeLeft = bufferDuration - elapsed;
+  
+  // KEY FIX: Don't transition past the loop point when looping
+  const nextChunkStartBeats = (currentChunkIndex + 1) * CHUNK_BEATS;
+  const shouldTransition = isLooping 
+    ? (nextChunkStartBeats < noteEndBeats)
+    : true;
 
-  if (timeLeft < SCHEDULE_AHEAD_TIME && !isPreparingNextChunk) {
+  if (shouldTransition && timeLeft < SCHEDULE_AHEAD_TIME && !isPreparingNextChunk) {
     const nextIdx = currentChunkIndex + 1;
     chunkStartTime += bufferDuration; 
     currentChunkIndex = nextIdx;
@@ -7189,14 +7240,21 @@ function drawPlayHead() {
     }
   }
 
-  const visualTime = isLooping 
-    ? (globalBeat % noteEndBeats) * (60/TEMPO) 
-    : Math.min(globalBeat * (60/TEMPO), trueEnd);
+  // Calculate visual position
+  let visualTime;
+  if (isLooping) {
+    // Wrap the beat position within the loop length
+    const wrappedBeat = ((globalBeat % noteEndBeats) + noteEndBeats) % noteEndBeats;
+    visualTime = wrappedBeat * (60 / TEMPO);
+  } else {
+    visualTime = Math.min(globalBeat * (60 / TEMPO), trueEnd);
+  }
     
   const absoluteX = (visualTime / stepSec) * CELL_W;
   const scrollLeft = container.scrollLeft;
   const viewWidth = canvas.width;
 
+  // Auto-scroll to keep playhead visible
   const margin = viewWidth / 4;
   if (absoluteX < scrollLeft || absoluteX > scrollLeft + viewWidth - margin) {
      container.scrollLeft = absoluteX - margin;
@@ -7204,6 +7262,7 @@ function drawPlayHead() {
   
   redrawAll();
 
+  // Draw playhead
   const screenX = absoluteX - scrollLeft;
   ctx.fillStyle = '#ff5722';
   ctx.fillRect(screenX, 0, 2, canvas.height);
@@ -7211,21 +7270,31 @@ function drawPlayHead() {
   playAnim = requestAnimationFrame(drawPlayHead);
 }
 
-// --- Helpers for Chunking ---
+// --- Helpers for Chunking (FIXED) ---
 
 async function prepareNextChunk(nextIndex) {
   isPreparingNextChunk = true;
+  const isLooping = document.getElementById('loop').checked;
+  
+  const lastStep = findLastStep();
+  const noteEndBeats = lastStep >= 0 ? ((lastStep + 1) / SUBDIV) : 0;
   const trueEnd = playbackTrueEnd > 0 ? playbackTrueEnd : getTrueEndTime();
   const trueEndBeats = trueEnd / (60 / TEMPO);
+  
+  // KEY FIX: For looping, stop preparing at the loop point (noteEndBeats)
+  // For non-looping, stop preparing at the true audio end
+  const endBeats = isLooping ? noteEndBeats : trueEndBeats;
   const nextChunkStartBeat = nextIndex * CHUNK_BEATS;
   
-  if (!document.getElementById('loop').checked && nextChunkStartBeat >= trueEndBeats) {
+  if (nextChunkStartBeat >= endBeats) {
     nextChunkBuffer = null; 
     isPreparingNextChunk = false;
     return;
   }
 
-  const tail = calculateChunkTail(nextIndex);
+  // KEY FIX: For looping, don't add tail - loop should be tight
+  // For non-looping, add tail so final notes ring out naturally
+  const tail = isLooping ? 0 : calculateChunkTail(nextIndex);
   nextChunkBuffer = await renderChunk(nextIndex * CHUNK_BEATS, CHUNK_BEATS, tail);
   isPreparingNextChunk = false;
 }
@@ -7240,7 +7309,6 @@ function playPreparedNextChunk() {
   currentChunkSource = audioCtx.createBufferSource();
   currentChunkSource.buffer = nextChunkBuffer;
   
-  // FIX: Connect to masterGain, not destination
   currentChunkSource.connect(masterGain); 
   currentChunkSource.start(chunkStartTime); 
 

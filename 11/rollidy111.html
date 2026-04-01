@@ -1,5 +1,8 @@
 <!--
-    The melody ends when the last note finishes playing, right now it's cutting it short and not taking into account the corner's decay.
+    HumanIntervention:
+        - On playNoteFromLabel if isDrum then we do not hold.
+        
+    The volume slider isn't working, please fix. (edited VOLUME CONTROL LOGIC. scheduleNote, startPlayback)
     
     Remember that it is Virtual, the canvas never grows it's a window of the full melody.
     
@@ -9,7 +12,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Rollidy 10.8</title>
+<title>Rollidy 11.1</title>
 <style>
   .label-row:nth-child(even) {
     background: var(--pair-row-bg);
@@ -1059,8 +1062,9 @@ STYLE.snes_epiano = class extends InstrumentStyle {
     const distortion = ctx.createWaveShaper();
     distortion.curve = this.makeDistortionCurve(20);
 
+    // FIX: Boosted from 1.2 to 5.0 to compensate for scheduleNote's 0.2 wrapper
     const gainBoost = ctx.createGain();
-    gainBoost.gain.value = 1.2; 
+    gainBoost.gain.value = 5.0; 
 
     const envelope = ctx.createGain();
     const now = ctx.currentTime;
@@ -1080,11 +1084,20 @@ STYLE.snes_epiano = class extends InstrumentStyle {
 
     osc.start();
     this.activeOsc = osc;
+    this.activeEnv = envelope; // FIX: Store for proper stop
   }
 
   stop() {
     if (this.activeOsc) {
-      try { this.activeOsc.stop(); } catch(e) {}
+      try {
+        const ctx = this.audioContext;
+        if (ctx && this.activeEnv) {
+          this.activeEnv.gain.cancelScheduledValues(ctx.currentTime);
+          this.activeEnv.gain.setValueAtTime(this.activeEnv.gain.value, ctx.currentTime);
+          this.activeEnv.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+          this.activeOsc.stop(ctx.currentTime + 0.11);
+        }
+      } catch(e) {}
       this.activeOsc = null;
     }
   }
@@ -1100,7 +1113,6 @@ STYLE.snes_epiano = class extends InstrumentStyle {
     return curve;
   }
 
-  // FIX: Added startTime
   createOscillator(ctx, freq, state, startTime = 0) {
     const osc = ctx.createOscillator();
     osc.type = 'sawtooth';
@@ -1113,15 +1125,15 @@ STYLE.snes_epiano = class extends InstrumentStyle {
     const distortion = ctx.createWaveShaper();
     distortion.curve = this.makeDistortionCurve(20);
 
+    // FIX: Same boost for renderer
     const gainBoost = ctx.createGain();
-    gainBoost.gain.value = 1.2;
+    gainBoost.gain.value = 5.0;
 
     const envelope = ctx.createGain();
     const attack = 0.01;
     const decay = state.decay || 0.2;
     const sustain = state.sustain || 0.3;
     
-    // FIX: Use startTime
     envelope.gain.setValueAtTime(0, startTime);
     envelope.gain.linearRampToValueAtTime(0.8, startTime + attack);
     envelope.gain.exponentialRampToValueAtTime(sustain, startTime + attack + decay);
@@ -1210,15 +1222,12 @@ STYLE.snes_pulse = class extends InstrumentStyle {
 };
 
 // 9. SNES Strings
-// 9. SNES Strings
 STYLE.snes_strings = class extends InstrumentStyle {
   constructor() { 
     super("SNES Strings", "snes_strings"); 
-    // FIX: percussive = true ensures the scheduler triggers every note individually (Stabs).
-    this.percussive = true; 
   }
   
-  createDefaultState() { return { waveType: 'snes_strings', attack: 0.1, release: 0.3 }; }
+  createDefaultState() { return { waveType: 'snes_strings', attack: 0.1, release: 0.3, hold: false }; }
   getStyleSelectorValue() { return "snes_strings"; }
 
   createControls(container, state, audioContext) {
@@ -1229,6 +1238,9 @@ STYLE.snes_strings = class extends InstrumentStyle {
       <div class="form-group">
         <label>Release: <input type="range" id="ctrl_release" min="0.05" max="1" step="0.01" value="${state.release}"></label>
       </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="ctrl_hold" ${state.hold ? 'checked' : ''}> Hold (Legato)</label>
+      </div>
     `;
   }
 
@@ -1236,8 +1248,10 @@ STYLE.snes_strings = class extends InstrumentStyle {
     state.waveType = 'snes_strings';
     const atkEl = document.getElementById('ctrl_attack');
     const relEl = document.getElementById('ctrl_release');
+    const holdChk = document.getElementById('ctrl_hold');
     if(atkEl) state.attack = parseFloat(atkEl.value);
     if(relEl) state.release = parseFloat(relEl.value);
+    if(holdChk) state.hold = holdChk.checked;
   }
 
   start(freq, state) {
@@ -1259,23 +1273,43 @@ STYLE.snes_strings = class extends InstrumentStyle {
     envelope.gain.cancelScheduledValues(now);
     envelope.gain.setValueAtTime(0, now);
     envelope.gain.linearRampToValueAtTime(0.8, now + attack);
-    envelope.gain.exponentialRampToValueAtTime(0.001, now + attack + release);
+
+    if (state.hold) {
+      // Hold mode: sustain at peak, don't auto-release
+    } else {
+      // Stab mode: auto-release after attack+release time
+      envelope.gain.exponentialRampToValueAtTime(0.001, now + attack + release);
+    }
 
     osc.connect(filter);
     filter.connect(envelope);
     envelope.connect(this.masterGain);
 
     osc.start(now);
-    // Keep manual stop for live playback to ensure cleanup
-    osc.stop(now + attack + release + 0.1);
+
+    if (!state.hold) {
+      osc.stop(now + attack + release + 0.1);
+    }
 
     this.activeOsc = osc;
     this.activeEnv = envelope;
+    this.savedState = state;
   }
 
   stop() {
     if (this.activeOsc) {
-      try { this.activeOsc.stop(); } catch(e) {}
+      try {
+        const ctx = this.audioContext;
+        if (ctx && this.activeEnv) {
+          const release = (this.savedState && this.savedState.release) ? this.savedState.release : 0.3;
+          this.activeEnv.gain.cancelScheduledValues(ctx.currentTime);
+          this.activeEnv.gain.setValueAtTime(this.activeEnv.gain.value, ctx.currentTime);
+          this.activeEnv.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + release);
+          this.activeOsc.stop(ctx.currentTime + release + 0.1);
+        } else {
+          this.activeOsc.stop();
+        }
+      } catch(e) {}
       this.activeOsc = null;
     }
   }
@@ -1293,19 +1327,20 @@ STYLE.snes_strings = class extends InstrumentStyle {
     const attack = state.attack || 0.1;
     const release = state.release || 0.3;
 
-    // Schedule Envelope
     envelope.gain.setValueAtTime(0, startTime);
     envelope.gain.linearRampToValueAtTime(0.8, startTime + attack);
-    envelope.gain.exponentialRampToValueAtTime(0.001, startTime + attack + release);
+
+    if (state.hold) {
+      // Hold mode: sustain at peak
+    } else {
+      // Stab mode: use configured release
+      envelope.gain.exponentialRampToValueAtTime(0.001, startTime + attack + release);
+    }
 
     osc.connect(filter);
     filter.connect(envelope);
 
-    // FIX: Removed osc.stop() from here. 
-    // The scheduler (renderChunk) will handle stopping the oscillator.
-    // This prevents conflicts that cause silence during export.
-
-    return { oscillators: [osc], outputNode: envelope };
+    return { oscillators: [osc], outputNode: envelope, hold: state.hold };
   }
 };
 
@@ -1453,7 +1488,11 @@ STYLE.gb_wave = class extends InstrumentStyle {
   createDefaultState() { return { hold: false }; }
 
   createControls(container, state, audioContext) {
-    container.innerHTML = ``;
+    container.innerHTML = `
+      <div class="form-group">
+        <label><input type="checkbox" id="ctrl_hold" ${state.hold ? 'checked' : ''}> Hold (Legato)</label>
+      </div>
+    `;
   }
 
   saveSettings(state) {
@@ -1480,7 +1519,14 @@ STYLE.gb_wave = class extends InstrumentStyle {
     osc.frequency.value = freq;
 
     const env = ctx.createGain();
-    env.gain.setValueAtTime(0.2, ctx.currentTime);
+    const now = ctx.currentTime;
+    env.gain.setValueAtTime(0.2, now);
+
+    // FIX: If hold is off, automatically fade out and stop the oscillator
+    if (!state.hold) {
+      env.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      osc.stop(now + 0.11);
+    }
 
     osc.connect(env);
     env.connect(this.masterGain);
@@ -1903,7 +1949,11 @@ STYLE.genesis_pad = class extends InstrumentStyle {
 
 // 17. Acoustic Guitar
 STYLE.acoustic_guitar = class extends InstrumentStyle {
-  constructor() { super("Acoustic Guitar", "acoustic_guitar"); this.percussive = true; }
+  constructor() { 
+    super("Acoustic Guitar", "acoustic_guitar"); 
+    // FIX: Removed this.percussive = true; so the scheduler allows legato
+  }
+  
   createDefaultState() { return { decay: 0.5, brightness: 1.5, hold: false }; }
 
   createControls(container, state, audioContext) {
@@ -1914,14 +1964,19 @@ STYLE.acoustic_guitar = class extends InstrumentStyle {
       <div class="form-group">
         <label>Brightness: <input type="range" id="ctrl_bright" min="0.5" max="4" step="0.1" value="${state.brightness}"></label>
       </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="ctrl_hold" ${state.hold ? 'checked' : ''}> Hold (Legato)</label>
+      </div>
     `;
   }
 
   saveSettings(state) {
     const decEl = document.getElementById('ctrl_decay');
     const brEl = document.getElementById('ctrl_bright');
+    const holdChk = document.getElementById('ctrl_hold');
     if(decEl) state.decay = parseFloat(decEl.value);
     if(brEl) state.brightness = parseFloat(brEl.value);
+    if(holdChk) state.hold = holdChk.checked;
   }
 
   start(freq, state) {
@@ -1937,24 +1992,45 @@ STYLE.acoustic_guitar = class extends InstrumentStyle {
     
     const now = ctx.currentTime;
     filter.frequency.setValueAtTime(freq * state.brightness * 4, now);
-    filter.frequency.exponentialRampToValueAtTime(freq * state.brightness * 0.5, now + state.decay);
 
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.4, now);
-    env.gain.exponentialRampToValueAtTime(0.001, now + state.decay);
+
+    if (!state.hold) {
+      // Normal mode: Pluck and naturally decay
+      filter.frequency.exponentialRampToValueAtTime(freq * state.brightness * 0.5, now + state.decay);
+      env.gain.exponentialRampToValueAtTime(0.001, now + state.decay);
+      osc.stop(now + state.decay + 0.1);
+    } else {
+      // Hold mode: Sustain the brightness until stop() is called
+      filter.frequency.exponentialRampToValueAtTime(freq * state.brightness * 2, now + 0.05);
+    }
 
     osc.connect(filter);
     filter.connect(env);
     env.connect(this.masterGain);
     
     osc.start();
-    osc.stop(now + state.decay + 0.1);
     this.activeOsc = osc;
+    this.activeEnv = env;
+    this.savedState = state;
   }
 
   stop() {
     if (this.activeOsc) {
-      try { this.activeOsc.stop(); } catch(e) {}
+      try {
+        const ctx = this.audioContext;
+        if (ctx && this.activeEnv) {
+          // Use decay time as the release tail when letting go
+          const rel = (this.savedState && this.savedState.decay) ? this.savedState.decay : 0.5;
+          this.activeEnv.gain.cancelScheduledValues(ctx.currentTime);
+          this.activeEnv.gain.setValueAtTime(this.activeEnv.gain.value, ctx.currentTime);
+          this.activeEnv.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + rel);
+          this.activeOsc.stop(ctx.currentTime + rel + 0.1);
+        } else {
+          this.activeOsc.stop();
+        }
+      } catch(e) {}
       this.activeOsc = null;
     }
   }
@@ -1969,16 +2045,22 @@ STYLE.acoustic_guitar = class extends InstrumentStyle {
     filter.Q.value = 1;
     
     filter.frequency.setValueAtTime(freq * state.brightness * 4, startTime);
-    filter.frequency.exponentialRampToValueAtTime(freq * state.brightness * 0.5, startTime + state.decay);
 
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.4, startTime);
-    env.gain.exponentialRampToValueAtTime(0.001, startTime + state.decay);
+
+    if (!state.hold) {
+      filter.frequency.exponentialRampToValueAtTime(freq * state.brightness * 0.5, startTime + state.decay);
+      env.gain.exponentialRampToValueAtTime(0.001, startTime + state.decay);
+    } else {
+      filter.frequency.exponentialRampToValueAtTime(freq * state.brightness * 2, startTime + 0.05);
+    }
 
     osc.connect(filter);
     filter.connect(env);
 
-    return { oscillators: [osc], outputNode: env, hold: false };
+    // FIX: Return state.hold instead of hardcoded false
+    return { oscillators: [osc], outputNode: env, hold: state.hold };
   }
 };
 
@@ -2141,7 +2223,7 @@ STYLE.electric_guitar = class extends InstrumentStyle {
   }
 };
 
-// 18. Electric Guitar (SNES Rock Style - Corrected)
+// 18. Electric Guitar (SNES Rock Style
 STYLE.electric_guitar = class extends InstrumentStyle {
   constructor() { super("Electric Guitar", "electric_guitar"); }
   // Removed 'tone' from state as it now auto-tracks pitch
@@ -2301,7 +2383,10 @@ STYLE.electric_guitar = class extends InstrumentStyle {
 
 // 19. Bass Guitar
 STYLE.bass_guitar = class extends InstrumentStyle {
-  constructor() { super("Bass Guitar", "bass_guitar"); this.percussive = true; }
+  constructor() { 
+    super("Bass Guitar", "bass_guitar"); 
+  }
+  
   createDefaultState() { return { decay: 0.4, filter: 800, hold: false }; }
 
   createControls(container, state, audioContext) {
@@ -2312,14 +2397,19 @@ STYLE.bass_guitar = class extends InstrumentStyle {
       <div class="form-group">
         <label>Filter: <input type="range" id="ctrl_filter" min="100" max="2000" value="${state.filter}"></label>
       </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="ctrl_hold" ${state.hold ? 'checked' : ''}> Hold (Legato)</label>
+      </div>
     `;
   }
 
   saveSettings(state) {
     const decEl = document.getElementById('ctrl_decay');
     const filEl = document.getElementById('ctrl_filter');
+    const holdChk = document.getElementById('ctrl_hold');
     if(decEl) state.decay = parseFloat(decEl.value);
     if(filEl) state.filter = parseFloat(filEl.value);
+    if(holdChk) state.hold = holdChk.checked;
   }
 
   start(freq, state) {
@@ -2338,20 +2428,38 @@ STYLE.bass_guitar = class extends InstrumentStyle {
     const env = ctx.createGain();
     const now = ctx.currentTime;
     env.gain.setValueAtTime(0.5, now);
-    env.gain.exponentialRampToValueAtTime(0.001, now + state.decay);
+
+    if (!state.hold) {
+      // Normal mode: Pluck and decay naturally
+      env.gain.exponentialRampToValueAtTime(0.001, now + state.decay);
+      osc.stop(now + state.decay + 0.1);
+    }
 
     osc.connect(filter);
     filter.connect(env);
     env.connect(this.masterGain);
 
     osc.start();
-    osc.stop(now + state.decay + 0.1);
     this.activeOsc = osc;
+    this.activeEnv = env;
+    this.savedState = state;
   }
 
   stop() {
     if (this.activeOsc) {
-      try { this.activeOsc.stop(); } catch(e) {}
+      try {
+        const ctx = this.audioContext;
+        if (ctx && this.activeEnv) {
+          // Smooth fade out using the decay slider as release time
+          const rel = (this.savedState && this.savedState.decay) ? this.savedState.decay : 0.4;
+          this.activeEnv.gain.cancelScheduledValues(ctx.currentTime);
+          this.activeEnv.gain.setValueAtTime(this.activeEnv.gain.value, ctx.currentTime);
+          this.activeEnv.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + rel);
+          this.activeOsc.stop(ctx.currentTime + rel + 0.1);
+        } else {
+          this.activeOsc.stop();
+        }
+      } catch(e) {}
       this.activeOsc = null;
     }
   }
@@ -2368,12 +2476,16 @@ STYLE.bass_guitar = class extends InstrumentStyle {
 
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.5, startTime);
-    env.gain.exponentialRampToValueAtTime(0.001, startTime + state.decay);
+
+    if (!state.hold) {
+      env.gain.exponentialRampToValueAtTime(0.001, startTime + state.decay);
+    }
 
     osc.connect(filter);
     filter.connect(env);
     
-    return { oscillators: [osc], outputNode: env, hold: false };
+    // FIX: Pass state.hold instead of hardcoded false
+    return { oscillators: [osc], outputNode: env, hold: state.hold };
   }
 };
 
@@ -2600,7 +2712,7 @@ STYLE.flute = class extends InstrumentStyle {
 
 // 22. Bell
 STYLE.bell = class extends InstrumentStyle {
-  constructor() { super("Bell", "bell"); this.percussive = true; }
+  constructor() { super("Bell", "bell"); }
   createDefaultState() { return { decay: 2.0, brightness: 1000, hold: false }; }
 
   createControls(container, state, audioContext) {
@@ -2711,7 +2823,7 @@ STYLE.bell = class extends InstrumentStyle {
 
 // 23. Gong (Tam-Tam)
 STYLE.gong = class extends InstrumentStyle {
-  constructor() { super("Gong", "gong"); this.percussive = true; }
+  constructor() { super("Gong", "gong"); }
   
   createDefaultState() { 
     return { decay: 4.0, wobble: 10, hold: false }; 
@@ -2973,7 +3085,7 @@ STYLE.violin = class extends InstrumentStyle {
 
 // 25. UkUlele
 STYLE.ukulele = class extends InstrumentStyle {
-  constructor() { super("Ukulele", "ukulele"); this.percussive = true; }
+  constructor() { super("Ukulele", "ukulele"); }
   createDefaultState() { return { decay: 0.4, nylon: true, hold: false }; }
 
   createControls(container, state, audioContext) {
@@ -3172,8 +3284,6 @@ STYLE.tuba = class extends InstrumentStyle {
 STYLE.vibraphone = class extends InstrumentStyle {
   constructor() { 
     super("Vibraphone", "vibraphone"); 
-    this.percussive = true; // Allows rapid re-triggering for rolls
-    this.volume = 0.8;      // Balanced volume
   }
   
   createDefaultState() { 
@@ -3321,8 +3431,6 @@ STYLE.vibraphone = class extends InstrumentStyle {
 STYLE.xylophone = class extends InstrumentStyle {
   constructor() { 
     super("Xylophone", "xylophone"); 
-    this.percussive = true; 
-    this.volume = 0.8; // Match volume to other instruments
   }
   
   createDefaultState() { 
@@ -3455,8 +3563,6 @@ STYLE.xylophone = class extends InstrumentStyle {
 STYLE.marimba = class extends InstrumentStyle {
   constructor() { 
     super("Marimba", "marimba"); 
-    this.percussive = true; 
-    this.volume = 0.8; 
   }
   
   createDefaultState() { 
@@ -3566,7 +3672,7 @@ STYLE.marimba = class extends InstrumentStyle {
 
 // 30. Kick Drum
 STYLE.drum_kick = class extends InstrumentStyle {
-  constructor() { super("Drum Kick", "drum_kick"); this.isDrum = true; this.percussive = true; }
+  constructor() { super("Drum Kick", "drum_kick"); this.isDrum = true; }
   createDefaultState() { return { decay: 0.5, drive: 10, hold: false }; }
 
   createControls(container, state, audioContext) {
@@ -3668,7 +3774,7 @@ STYLE.drum_kick = class extends InstrumentStyle {
 
 // 31. Tom Drum
 STYLE.drum_tom = class extends InstrumentStyle {
-  constructor() { super("Drum Tom", "drum_tom"); this.isDrum = true; this.percussive = true; }
+  constructor() { super("Drum Tom", "drum_tom"); this.isDrum = true; }
   createDefaultState() { return { decay: 0.35, drive: 5, hold: false }; }
 
   createControls(container, state, audioContext) {
@@ -3772,7 +3878,7 @@ STYLE.drum_tom = class extends InstrumentStyle {
 
 // 32. Snare Drum
 STYLE.drum_snare = class extends InstrumentStyle {
-  constructor() { super("Drum Snare", "drum_snare"); this.isDrum = true; this.percussive = true; }
+  constructor() { super("Drum Snare", "drum_snare"); this.isDrum = true; }
   createDefaultState() { return { decay: 0.2, snap: 0.6, hold: false }; }
 
   createControls(container, state, audioContext) {
@@ -3900,7 +4006,7 @@ STYLE.drum_snare = class extends InstrumentStyle {
 
 // 33. Hi-Hat
 STYLE.drum_hihat = class extends InstrumentStyle {
-  constructor() { super("Drum Hi-Hat", "drum_hihat"); this.isDrum = true; this.percussive = true; }
+  constructor() { super("Drum Hi-Hat", "drum_hihat"); this.isDrum = true; }
   createDefaultState() { return { decay: 0.1, hold: false }; }
 
   createControls(container, state, audioContext) {
@@ -3981,7 +4087,7 @@ STYLE.drum_hihat = class extends InstrumentStyle {
 
 // 34. Cymbal
 STYLE.drum_cymbal = class extends InstrumentStyle {
-  constructor() { super("Drum Cymbal", "drum_cymbal"); this.isDrum = true; this.percussive = true; }
+  constructor() { super("Drum Cymbal", "drum_cymbal"); this.isDrum = true; }
   createDefaultState() { return { decay: 1.5, hold: false }; }
 
   createControls(container, state, audioContext) {
@@ -4062,7 +4168,7 @@ STYLE.drum_cymbal = class extends InstrumentStyle {
 
 // 35. Rocket
 STYLE.rocket = class extends InstrumentStyle {
-  constructor() { super("Rocket", "rocket"); this.percussive = true; }
+  constructor() { super("Rocket", "rocket"); }
   
   createDefaultState() { 
     return { decay: 4.0, trash: 0.8, hold: false }; 
@@ -6631,14 +6737,13 @@ const volumeSlider = document.getElementById('volumeSlider');
 if (volumeBtn && volumePopup && volumeSlider) {
     // 1. Toggle Popup Visibility
     volumeBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevent window click from closing it immediately
+        e.stopPropagation();
         const isVisible = volumePopup.style.display === 'block';
         volumePopup.style.display = isVisible ? 'none' : 'block';
     });
 
     // 2. Close on outside click
     window.addEventListener('click', (e) => {
-        // If the click is NOT inside the popup and NOT the button
         if (!volumePopup.contains(e.target) && e.target !== volumeBtn) {
             volumePopup.style.display = 'none';
         }
@@ -6646,13 +6751,20 @@ if (volumeBtn && volumePopup && volumeSlider) {
 
     // 3. Handle Slider Change
     volumeSlider.addEventListener('input', (e) => {
-        const val = e.target.value / 100;
+        const val = parseFloat(e.target.value) / 100;
         currentVolume = val;
-        
-        // UPDATE: Apply volume to ALL styles
-        Object.keys(STYLE).forEach(key => {
-            const style = getStyle(key);
-            style.setVolume(val);
+
+        // Update the global masterGain (used by chunked playback)
+        if (masterGain) {
+            masterGain.gain.setValueAtTime(val, masterGain.context.currentTime);
+        }
+
+        // Update any style instances that have been initialized (live preview)
+        Object.keys(styleCache).forEach(key => {
+            const style = styleCache[key];
+            if (style.masterGain) {
+                style.masterGain.gain.setValueAtTime(val * style.volume, style.audioContext.currentTime);
+            }
         });
     });
 }
@@ -6694,13 +6806,10 @@ function scheduleNote(ctx, start, dur, pitchIdx, instIdx) {
   // Case A: Complex Instrument (Has an outputNode like filters, envelopes)
   if (instResult.outputNode) {
     instResult.outputNode.connect(gainNode);
-    gainNode.connect(ctx.destination);
 
     if (instResult.oscillators) {
       instResult.oscillators.forEach(osc => {
         osc.start(start);
-        // Stop oscillator shortly after the scheduled duration to free resources
-        // Added 0.2s buffer for release tails
         osc.stop(start + dur + 0.2); 
       });
     }
@@ -6712,25 +6821,27 @@ function scheduleNote(ctx, start, dur, pitchIdx, instIdx) {
           osc.start(start);
           osc.stop(start + dur + 0.2);
       });
-      gainNode.connect(ctx.destination);
   }
   // Case C: Legacy/Basic Raw Oscillator
   else {
     const osc = instResult;
     osc.connect(gainNode);
-    gainNode.connect(ctx.destination);
     osc.start(start);
     osc.stop(start + dur + 0.2);
   }
 
+  // --- VOLUME: Connect to masterGain if this is the real playback context ---
+  if (ctx === audioCtx && masterGain) {
+    gainNode.connect(masterGain);
+  } else {
+    gainNode.connect(ctx.destination);
+  }
+
   // --- ENVELOPE LOGIC ---
 
-  // If the instrument is Percussive, it manages its own Envelope in createOscillator.
-  // We just set a master volume gain without imposing a sustain duration.
   if (style.percussive) {
       gainNode.gain.setValueAtTime(1.0, start); 
   } else {
-      // Standard Synth/Pad Envelope
       gainNode.gain.setValueAtTime(0, start);
       gainNode.gain.linearRampToValueAtTime(0.2, start + 0.01);
       
@@ -6745,7 +6856,7 @@ function scheduleNote(ctx, start, dur, pitchIdx, instIdx) {
         gainNode.gain.exponentialRampToValueAtTime(0.001, start + dur);
       }
   }
-}
+}startPlayback
 
 /* -------------------------------------------------
    LABEL CLICK (Uses Red Instrument 0 & Existing Silence)
@@ -6754,7 +6865,7 @@ function scheduleNote(ctx, start, dur, pitchIdx, instIdx) {
 function playNoteFromLabel(pitchIndex) {
   // 1. Get Red Instrument (Index 0) Settings
   const settings = instrumentSettings[0];
-  if (settings.waveType === 'mute') return;
+  if (settings.waveType === 'mute' || settings.isDrum) return;
 
   const style = getStyle(settings.waveType);
   const freq = midiToFreq(pitchToMidi(pitchIndex));
@@ -6767,7 +6878,10 @@ function playNoteFromLabel(pitchIndex) {
   style.setVolume(currentVolume);
 
   // 4. Play
-  style.start(freq, settings);
+  // FIX: Create a temporary state object that forces 'hold' to true
+  // This ensures the note sustains regardless of the saved instrument setting
+  const playState = { ...settings, hold: true };
+  style.start(freq, playState);
 }
 
 function stopNoteFromLabel() {
@@ -7045,7 +7159,7 @@ function bufferToWave(abuffer) {
 }
 
 /* -------------------------------------------------
-   PLAYBACK
+   PLAYBACK (FIXED LOOPING)
    ------------------------------------------------- */
 let playAnim = null;
 let playStartTime = 0;
@@ -7064,6 +7178,9 @@ async function startPlayback() {
     masterGain = audioCtx.createGain();
     masterGain.gain.value = currentVolume;
     masterGain.connect(audioCtx.destination);
+  } else {
+    // Always sync volume when starting playback
+    masterGain.gain.setValueAtTime(currentVolume, audioCtx.currentTime);
   }
   
   if (audioCtx.state === 'suspended') await audioCtx.resume();
@@ -7102,7 +7219,39 @@ async function startPlayback() {
 
 // Helper: Loads a specific chunk and plays it immediately
 async function loadAndPlayChunk(chunkIndex, startTimeOffset = 0) {
-  const tail = calculateChunkTail(chunkIndex);
+  const isLooping = document.getElementById('loop').checked;
+  const lastStep = findLastStep();
+  const noteEndBeats = lastStep >= 0 ? ((lastStep + 1) / SUBDIV) : 0;
+  const chunkStartBeats = chunkIndex * CHUNK_BEATS;
+  
+  // When looping, don't render chunks that start after the loop point
+  if (isLooping && chunkStartBeats >= noteEndBeats) {
+    // Create a minimal silent buffer just to keep the timing system working
+    const sampleRate = audioCtx.sampleRate;
+    const minDuration = 0.1;
+    const frameCount = Math.max(1, Math.ceil(sampleRate * minDuration));
+    const buffer = audioCtx.createBuffer(1, frameCount, sampleRate);
+    
+    if (currentChunkSource) {
+      try { currentChunkSource.stop(); } catch(e) {}
+    }
+
+    currentChunkSource = audioCtx.createBufferSource();
+    currentChunkSource.buffer = buffer;
+    currentChunkSource.connect(masterGain);
+    
+    let when = startTimeOffset > 0 ? Math.max(chunkStartTime, audioCtx.currentTime) : audioCtx.currentTime;
+    currentChunkSource.start(when, Math.min(startTimeOffset, minDuration));
+    
+    if (startTimeOffset === 0) {
+      chunkStartTime = audioCtx.currentTime;
+    }
+    return;
+  }
+  
+  // For looping: no tail (loop should be tight)
+  // For non-looping: add tail so final notes ring out
+  const tail = isLooping ? 0 : calculateChunkTail(chunkIndex);
   let buffer = await renderChunk(chunkIndex * CHUNK_BEATS, CHUNK_BEATS, tail);
   
   if (!isPlaying || !audioCtx) return;
@@ -7110,7 +7259,7 @@ async function loadAndPlayChunk(chunkIndex, startTimeOffset = 0) {
   if (!buffer) {
     const sampleRate = audioCtx.sampleRate;
     const chunkDuration = CHUNK_BEATS * (60 / TEMPO) + tail;
-    const frameCount = sampleRate * chunkDuration; 
+    const frameCount = Math.max(1, Math.ceil(sampleRate * chunkDuration)); 
     buffer = audioCtx.createBuffer(1, frameCount, sampleRate);
   }
 
@@ -7132,7 +7281,7 @@ async function loadAndPlayChunk(chunkIndex, startTimeOffset = 0) {
   }
 
   prepareNextChunk(chunkIndex + 1);
-}prepareNextChunk
+}
 
 function drawPlayHead() {
   if (!isPlaying || !audioCtx) return;
@@ -7143,7 +7292,11 @@ function drawPlayHead() {
   const lastStep = findLastStep();
   if (lastStep === -1) { stopPlayback(); return; }
 
+  // Two different end points:
+  // - noteEndBeats: Where the last note triggers (used as LOOP POINT)
+  // - trueEndBeats: Where all audio actually ends (used for non-loop stop)
   const noteEndBeats = ((lastStep + 1) / SUBDIV);
+  const noteEndTime = noteEndBeats * (60 / TEMPO);
   const trueEnd = playbackTrueEnd > 0 ? playbackTrueEnd : getTrueEndTime();
   const trueEndBeats = trueEnd / (60 / TEMPO);
   
@@ -7151,16 +7304,24 @@ function drawPlayHead() {
   const beatInChunk = elapsed / (60 / TEMPO);
   const globalBeat = currentBeatStart + beatInChunk;
 
-  if (globalBeat >= trueEndBeats) {
+  // KEY FIX: Use noteEndBeats for loop trigger, trueEndBeats for non-loop stop
+  const triggerBeats = isLooping ? noteEndBeats : trueEndBeats;
+
+  if (globalBeat >= triggerBeats) {
     if (isLooping) {
-      const loopBeats = noteEndBeats;
-      const overshootBeats = globalBeat - loopBeats;
+      // Calculate how far past the loop point we are
+      const overshootBeats = globalBeat - noteEndBeats;
       const overshootTime = overshootBeats * (60 / TEMPO);
+      
+      // Reset chunk tracking to the beginning with the overshoot
       chunkStartTime = audioCtx.currentTime - overshootTime;
       currentChunkIndex = 0;
+      
+      // Start playing from the beginning at the overshoot position
       loadAndPlayChunk(0, overshootTime);
       prepareNextChunk(1);
     } else {
+      // Non-looping: play to true end, draw final position, then stop
       const finalX = trueEnd / stepSec * CELL_W;
       const scrollLeft = container.scrollLeft;
       
@@ -7173,10 +7334,17 @@ function drawPlayHead() {
     }
   }
 
+  // Check if we need to transition to the next chunk
   const bufferDuration = currentChunkSource ? currentChunkSource.buffer.duration : 0;
   const timeLeft = bufferDuration - elapsed;
+  
+  // KEY FIX: Don't transition past the loop point when looping
+  const nextChunkStartBeats = (currentChunkIndex + 1) * CHUNK_BEATS;
+  const shouldTransition = isLooping 
+    ? (nextChunkStartBeats < noteEndBeats)
+    : true;
 
-  if (timeLeft < SCHEDULE_AHEAD_TIME && !isPreparingNextChunk) {
+  if (shouldTransition && timeLeft < SCHEDULE_AHEAD_TIME && !isPreparingNextChunk) {
     const nextIdx = currentChunkIndex + 1;
     chunkStartTime += bufferDuration; 
     currentChunkIndex = nextIdx;
@@ -7189,14 +7357,21 @@ function drawPlayHead() {
     }
   }
 
-  const visualTime = isLooping 
-    ? (globalBeat % noteEndBeats) * (60/TEMPO) 
-    : Math.min(globalBeat * (60/TEMPO), trueEnd);
+  // Calculate visual position
+  let visualTime;
+  if (isLooping) {
+    // Wrap the beat position within the loop length
+    const wrappedBeat = ((globalBeat % noteEndBeats) + noteEndBeats) % noteEndBeats;
+    visualTime = wrappedBeat * (60 / TEMPO);
+  } else {
+    visualTime = Math.min(globalBeat * (60 / TEMPO), trueEnd);
+  }
     
   const absoluteX = (visualTime / stepSec) * CELL_W;
   const scrollLeft = container.scrollLeft;
   const viewWidth = canvas.width;
 
+  // Auto-scroll to keep playhead visible
   const margin = viewWidth / 4;
   if (absoluteX < scrollLeft || absoluteX > scrollLeft + viewWidth - margin) {
      container.scrollLeft = absoluteX - margin;
@@ -7204,6 +7379,7 @@ function drawPlayHead() {
   
   redrawAll();
 
+  // Draw playhead
   const screenX = absoluteX - scrollLeft;
   ctx.fillStyle = '#ff5722';
   ctx.fillRect(screenX, 0, 2, canvas.height);
@@ -7211,21 +7387,31 @@ function drawPlayHead() {
   playAnim = requestAnimationFrame(drawPlayHead);
 }
 
-// --- Helpers for Chunking ---
+// --- Helpers for Chunking (FIXED) ---
 
 async function prepareNextChunk(nextIndex) {
   isPreparingNextChunk = true;
+  const isLooping = document.getElementById('loop').checked;
+  
+  const lastStep = findLastStep();
+  const noteEndBeats = lastStep >= 0 ? ((lastStep + 1) / SUBDIV) : 0;
   const trueEnd = playbackTrueEnd > 0 ? playbackTrueEnd : getTrueEndTime();
   const trueEndBeats = trueEnd / (60 / TEMPO);
+  
+  // KEY FIX: For looping, stop preparing at the loop point (noteEndBeats)
+  // For non-looping, stop preparing at the true audio end
+  const endBeats = isLooping ? noteEndBeats : trueEndBeats;
   const nextChunkStartBeat = nextIndex * CHUNK_BEATS;
   
-  if (!document.getElementById('loop').checked && nextChunkStartBeat >= trueEndBeats) {
+  if (nextChunkStartBeat >= endBeats) {
     nextChunkBuffer = null; 
     isPreparingNextChunk = false;
     return;
   }
 
-  const tail = calculateChunkTail(nextIndex);
+  // KEY FIX: For looping, don't add tail - loop should be tight
+  // For non-looping, add tail so final notes ring out naturally
+  const tail = isLooping ? 0 : calculateChunkTail(nextIndex);
   nextChunkBuffer = await renderChunk(nextIndex * CHUNK_BEATS, CHUNK_BEATS, tail);
   isPreparingNextChunk = false;
 }
@@ -7240,7 +7426,6 @@ function playPreparedNextChunk() {
   currentChunkSource = audioCtx.createBufferSource();
   currentChunkSource.buffer = nextChunkBuffer;
   
-  // FIX: Connect to masterGain, not destination
   currentChunkSource.connect(masterGain); 
   currentChunkSource.start(chunkStartTime); 
 
