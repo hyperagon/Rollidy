@@ -1,0 +1,260 @@
+{
+  "name": "Rolldiy Composition",
+  "date": "2026-04-01T14:09:26.741Z",
+  "bpm": 120,
+  "subdivision": 4,
+  "notes": [
+    {
+      "note": "C5",
+      "freq": 523.2511306011972,
+      "time": 0,
+      "duration": 625,
+      "instrument": 0
+    },
+    {
+      "note": "C1",
+      "freq": 32.70319566257483,
+      "time": 0,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "D1",
+      "freq": 36.70809598967594,
+      "time": 125,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "D1",
+      "freq": 36.70809598967594,
+      "time": 375,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C1",
+      "freq": 32.70319566257483,
+      "time": 500,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C#1",
+      "freq": 34.64782887210901,
+      "time": 625,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "D#5",
+      "freq": 622.2539674441618,
+      "time": 875,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "C#1",
+      "freq": 34.64782887210901,
+      "time": 875,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C1",
+      "freq": 32.70319566257483,
+      "time": 1000,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C5",
+      "freq": 523.2511306011972,
+      "time": 1125,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "D1",
+      "freq": 36.70809598967594,
+      "time": 1125,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C#5",
+      "freq": 554.3652619537442,
+      "time": 1375,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "D1",
+      "freq": 36.70809598967594,
+      "time": 1375,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C1",
+      "freq": 32.70319566257483,
+      "time": 1500,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "G4",
+      "freq": 391.99543598174927,
+      "time": 1625,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "C#1",
+      "freq": 34.64782887210901,
+      "time": 1625,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "A#4",
+      "freq": 466.1637615180899,
+      "time": 1875,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "C#1",
+      "freq": 34.64782887210901,
+      "time": 1875,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C1",
+      "freq": 32.70319566257483,
+      "time": 2000,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C5",
+      "freq": 523.2511306011972,
+      "time": 2125,
+      "duration": 625,
+      "instrument": 0
+    },
+    {
+      "note": "D1",
+      "freq": 36.70809598967594,
+      "time": 2125,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "D1",
+      "freq": 36.70809598967594,
+      "time": 2375,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C1",
+      "freq": 32.70319566257483,
+      "time": 2500,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C#1",
+      "freq": 34.64782887210901,
+      "time": 2625,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "G#4",
+      "freq": 415.3046975799451,
+      "time": 2875,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "C#1",
+      "freq": 34.64782887210901,
+      "time": 2875,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C1",
+      "freq": 32.70319566257483,
+      "time": 3000,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "A#4",
+      "freq": 466.1637615180899,
+      "time": 3125,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "D1",
+      "freq": 36.70809598967594,
+      "time": 3125,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "B4",
+      "freq": 493.8833012561241,
+      "time": 3250,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "E5",
+      "freq": 659.2551138257398,
+      "time": 3375,
+      "duration": 250,
+      "instrument": 0
+    },
+    {
+      "note": "D1",
+      "freq": 36.70809598967594,
+      "time": 3375,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C1",
+      "freq": 32.70319566257483,
+      "time": 3500,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C#1",
+      "freq": 34.64782887210901,
+      "time": 3625,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "G#5",
+      "freq": 830.6093951598903,
+      "time": 3750,
+      "duration": 250,
+      "instrument": 0
+    },
+    {
+      "note": "C#1",
+      "freq": 34.64782887210901,
+      "time": 3875,
+      "duration": 125,
+      "instrument": 1
+    }
+  ]
+}
