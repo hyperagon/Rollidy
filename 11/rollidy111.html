@@ -7,6 +7,9 @@
     Remember that it is Virtual, the canvas never grows it's a window of the full melody.
     
     Give me full updated functions, I need to know exactly where to put them. And avoid placeholders like rest of the function
+
+    Human Intervention:
+        - Rollidiy -> Rollidy on exportJson
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -7476,7 +7479,7 @@ function stopPlayback() {
 function exportJson() {
   const list = generateMelodyList();
   const data = { 
-    name: "Rolldiy Composition",
+    name: "Rolling Melody",
     date: new Date().toISOString(),
     bpm: TEMPO,
     subdivision: SUBDIV,

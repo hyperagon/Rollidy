@@ -1,0 +1,57 @@
+{
+  "name": "Rolling Melody",
+  "date": "2026-03-23T16:07:44.831Z",
+  "bpm": 120,
+  "subdivision": 4,
+  "notes": [
+    {
+      "note": "C5",
+      "freq": 523.2511306011972,
+      "time": 0,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "D#5",
+      "freq": 622.2539674441618,
+      "time": 125,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "E5",
+      "freq": 659.2551138257398,
+      "time": 250,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "G5",
+      "freq": 783.9908719634985,
+      "time": 375,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "A#5",
+      "freq": 932.3275230361799,
+      "time": 625,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "B5",
+      "freq": 987.7666025122483,
+      "time": 750,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "B5",
+      "freq": 987.7666025122483,
+      "time": 1250,
+      "duration": 125,
+      "instrument": 1
+    }
+  ]
+}

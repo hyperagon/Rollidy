@@ -1,0 +1,148 @@
+{
+  "name": "Rolling Melody",
+  "date": "2026-03-18T10:29:15.835Z",
+  "bpm": 120,
+  "subdivision": 4,
+  "notes": [
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 0,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 0,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 0,
+      "duration": 125,
+      "instrument": 2
+    },
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 0,
+      "duration": 125,
+      "instrument": 3
+    },
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 250,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 250,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 250,
+      "duration": 125,
+      "instrument": 2
+    },
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 250,
+      "duration": 125,
+      "instrument": 3
+    },
+    {
+      "note": "G#6",
+      "freq": 1661.2187903197805,
+      "time": 500,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "G#6",
+      "freq": 1661.2187903197805,
+      "time": 500,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "G#6",
+      "freq": 1661.2187903197805,
+      "time": 500,
+      "duration": 125,
+      "instrument": 2
+    },
+    {
+      "note": "G#6",
+      "freq": 1661.2187903197805,
+      "time": 500,
+      "duration": 125,
+      "instrument": 3
+    },
+    {
+      "note": "A6",
+      "freq": 1760,
+      "time": 625,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "A6",
+      "freq": 1760,
+      "time": 625,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "A6",
+      "freq": 1760,
+      "time": 625,
+      "duration": 125,
+      "instrument": 2
+    },
+    {
+      "note": "A6",
+      "freq": 1760,
+      "time": 625,
+      "duration": 125,
+      "instrument": 3
+    },
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 750,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 750,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 750,
+      "duration": 125,
+      "instrument": 2
+    },
+    {
+      "note": "A#6",
+      "freq": 1864.6550460723597,
+      "time": 750,
+      "duration": 125,
+      "instrument": 3
+    }
+  ]
+}

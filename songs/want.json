@@ -1,6 +1,6 @@
 {
-  "name": "Rolldiy Composition",
-  "date": "2026-03-20T16:48:13.862Z",
+  "name": "Rolling Melody",
+  "date": "2026-03-24T19:24:44.262Z",
   "bpm": 120,
   "subdivision": 4,
   "notes": [
@@ -103,9 +103,30 @@
       "instrument": 0
     },
     {
+      "note": "D1",
+      "freq": 36.70809598967594,
+      "time": 1125,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
       "note": "C#5",
       "freq": 554.3652619537442,
       "time": 1375,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "D1",
+      "freq": 36.70809598967594,
+      "time": 1375,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "C1",
+      "freq": 32.70319566257483,
+      "time": 1500,
       "duration": 125,
       "instrument": 0
     },
@@ -117,9 +138,30 @@
       "instrument": 0
     },
     {
-      "note": "B4",
-      "freq": 493.8833012561241,
+      "note": "C#1",
+      "freq": 34.64782887210901,
+      "time": 1625,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "A#4",
+      "freq": 466.1637615180899,
       "time": 1875,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "C#1",
+      "freq": 34.64782887210901,
+      "time": 1875,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "C1",
+      "freq": 32.70319566257483,
+      "time": 2000,
       "duration": 125,
       "instrument": 0
     }
