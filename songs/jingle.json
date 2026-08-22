@@ -1,0 +1,120 @@
+{
+  "name": "Rolling Melody",
+  "date": "2026-08-20T18:39:01.257Z",
+  "bpm": 180,
+  "subdivision": 4,
+  "notes": [
+    {
+      "note": "G4",
+      "freq": 391.99543598174927,
+      "time": 0,
+      "duration": 167,
+      "instrument": 1
+    },
+    {
+      "note": "E4",
+      "freq": 329.6275569128699,
+      "time": 0,
+      "duration": 167,
+      "instrument": 0
+    },
+    {
+      "note": "C5",
+      "freq": 523.2511306011972,
+      "time": 167,
+      "duration": 167,
+      "instrument": 1
+    },
+    {
+      "note": "A4",
+      "freq": 440,
+      "time": 167,
+      "duration": 167,
+      "instrument": 0
+    },
+    {
+      "note": "F5",
+      "freq": 698.4564628660078,
+      "time": 250,
+      "duration": 167,
+      "instrument": 1
+    },
+    {
+      "note": "D5",
+      "freq": 587.3295358348151,
+      "time": 250,
+      "duration": 167,
+      "instrument": 0
+    },
+    {
+      "note": "A5",
+      "freq": 880,
+      "time": 417,
+      "duration": 167,
+      "instrument": 1
+    },
+    {
+      "note": "G5",
+      "freq": 783.9908719634985,
+      "time": 417,
+      "duration": 167,
+      "instrument": 0
+    },
+    {
+      "note": "E5",
+      "freq": 659.2551138257398,
+      "time": 500,
+      "duration": 167,
+      "instrument": 0
+    },
+    {
+      "note": "C5",
+      "freq": 523.2511306011972,
+      "time": 500,
+      "duration": 167,
+      "instrument": 1
+    },
+    {
+      "note": "G4",
+      "freq": 391.99543598174927,
+      "time": 667,
+      "duration": 167,
+      "instrument": 0
+    },
+    {
+      "note": "E4",
+      "freq": 329.6275569128699,
+      "time": 667,
+      "duration": 167,
+      "instrument": 1
+    },
+    {
+      "note": "A4",
+      "freq": 440,
+      "time": 750,
+      "duration": 167,
+      "instrument": 1
+    },
+    {
+      "note": "F4",
+      "freq": 349.2282314330039,
+      "time": 750,
+      "duration": 167,
+      "instrument": 0
+    },
+    {
+      "note": "C5",
+      "freq": 523.2511306011972,
+      "time": 917,
+      "duration": 250,
+      "instrument": 1
+    },
+    {
+      "note": "G4",
+      "freq": 391.99543598174927,
+      "time": 917,
+      "duration": 167,
+      "instrument": 0
+    }
+  ]
+}
