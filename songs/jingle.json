@@ -1,6 +1,6 @@
 {
   "name": "Rolling Melody",
-  "date": "2026-08-20T18:39:01.257Z",
+  "date": "2026-08-24T11:29:42.954Z",
   "bpm": 180,
   "subdivision": 4,
   "notes": [
@@ -8,7 +8,7 @@
       "note": "G4",
       "freq": 391.99543598174927,
       "time": 0,
-      "duration": 167,
+      "duration": 83,
       "instrument": 1
     },
     {
@@ -19,10 +19,17 @@
       "instrument": 0
     },
     {
+      "note": "G4",
+      "freq": 391.99543598174927,
+      "time": 83,
+      "duration": 83,
+      "instrument": 1
+    },
+    {
       "note": "C5",
       "freq": 523.2511306011972,
       "time": 167,
-      "duration": 167,
+      "duration": 83,
       "instrument": 1
     },
     {
@@ -36,7 +43,7 @@
       "note": "F5",
       "freq": 698.4564628660078,
       "time": 250,
-      "duration": 167,
+      "duration": 83,
       "instrument": 1
     },
     {
@@ -47,10 +54,24 @@
       "instrument": 0
     },
     {
+      "note": "C5",
+      "freq": 523.2511306011972,
+      "time": 250,
+      "duration": 83,
+      "instrument": 1
+    },
+    {
+      "note": "F5",
+      "freq": 698.4564628660078,
+      "time": 333,
+      "duration": 83,
+      "instrument": 1
+    },
+    {
       "note": "A5",
       "freq": 880,
       "time": 417,
-      "duration": 167,
+      "duration": 83,
       "instrument": 1
     },
     {
@@ -59,6 +80,13 @@
       "time": 417,
       "duration": 167,
       "instrument": 0
+    },
+    {
+      "note": "A5",
+      "freq": 880,
+      "time": 500,
+      "duration": 83,
+      "instrument": 1
     },
     {
       "note": "E5",
@@ -71,7 +99,14 @@
       "note": "C5",
       "freq": 523.2511306011972,
       "time": 500,
-      "duration": 167,
+      "duration": 83,
+      "instrument": 1
+    },
+    {
+      "note": "C5",
+      "freq": 523.2511306011972,
+      "time": 583,
+      "duration": 83,
       "instrument": 1
     },
     {
@@ -85,14 +120,14 @@
       "note": "E4",
       "freq": 329.6275569128699,
       "time": 667,
-      "duration": 167,
+      "duration": 83,
       "instrument": 1
     },
     {
       "note": "A4",
       "freq": 440,
       "time": 750,
-      "duration": 167,
+      "duration": 83,
       "instrument": 1
     },
     {
@@ -103,10 +138,24 @@
       "instrument": 0
     },
     {
+      "note": "E4",
+      "freq": 329.6275569128699,
+      "time": 750,
+      "duration": 83,
+      "instrument": 1
+    },
+    {
+      "note": "A4",
+      "freq": 440,
+      "time": 833,
+      "duration": 83,
+      "instrument": 1
+    },
+    {
       "note": "C5",
       "freq": 523.2511306011972,
       "time": 917,
-      "duration": 250,
+      "duration": 83,
       "instrument": 1
     },
     {
@@ -115,6 +164,13 @@
       "time": 917,
       "duration": 167,
       "instrument": 0
+    },
+    {
+      "note": "C5",
+      "freq": 523.2511306011972,
+      "time": 1000,
+      "duration": 83,
+      "instrument": 1
     }
   ]
 }
