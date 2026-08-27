@@ -1,0 +1,106 @@
+{
+  "name": "Rolling Melody",
+  "date": "2026-08-26T16:44:46.638Z",
+  "bpm": 120,
+  "subdivision": 4,
+  "notes": [
+    {
+      "note": "E3",
+      "freq": 164.81377845643496,
+      "time": 0,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "E3",
+      "freq": 164.81377845643496,
+      "time": 0,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "G3",
+      "freq": 195.99771799087463,
+      "time": 125,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "G3",
+      "freq": 195.99771799087463,
+      "time": 125,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "A3",
+      "freq": 220,
+      "time": 250,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "A3",
+      "freq": 220,
+      "time": 250,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C4",
+      "freq": 261.6255653005986,
+      "time": 375,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "C4",
+      "freq": 261.6255653005986,
+      "time": 375,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "D4",
+      "freq": 293.6647679174076,
+      "time": 500,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "D4",
+      "freq": 293.6647679174076,
+      "time": 500,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "E4",
+      "freq": 329.6275569128699,
+      "time": 625,
+      "duration": 125,
+      "instrument": 0
+    },
+    {
+      "note": "E4",
+      "freq": 329.6275569128699,
+      "time": 625,
+      "duration": 125,
+      "instrument": 1
+    },
+    {
+      "note": "C4",
+      "freq": 261.6255653005986,
+      "time": 875,
+      "duration": 500,
+      "instrument": 0
+    },
+    {
+      "note": "C4",
+      "freq": 261.6255653005986,
+      "time": 875,
+      "duration": 500,
+      "instrument": 1
+    }
+  ]
+}
